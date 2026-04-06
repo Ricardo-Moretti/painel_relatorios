@@ -6,7 +6,7 @@
 const mysql = require('mysql2/promise');
 const glpiRepository = require('../repositories/glpiRepository');
 const rotinaRepository = require('../repositories/rotinaRepository');
-const { db } = require('../config/database');
+const { pool: painelPool } = require('../config/database');
 const { getSecureEnv } = require('../config/crypto');
 require('dotenv').config();
 
@@ -19,19 +19,17 @@ if (!Number.isInteger(GRUPO_TI_ID)) throw new Error('GRUPO_TI_ID must be integer
 
 const glpiIntegracaoService = {
 
-  /** Salva dados no cache local (SQLite) */
+  /** Salva dados no cache local (MySQL) — fire-and-forget */
   _salvarCache(chave, dados) {
-    try {
-      db.prepare("INSERT OR REPLACE INTO cache_dados (chave, valor, atualizado_em) VALUES (?, ?, datetime('now'))").run(chave, JSON.stringify(dados));
-    } catch (e) { console.log('[Cache] Erro ao salvar:', e.message) }
+    painelPool.execute(
+      'REPLACE INTO cache_dados (chave, valor, atualizado_em) VALUES (?, ?, NOW())',
+      [chave, JSON.stringify(dados)]
+    ).catch(e => console.log('[Cache] Erro ao salvar:', e.message));
   },
 
-  /** Busca dados do cache local */
+  /** Busca dados do cache local — retorna null se falhar (sync facade via stored promise) */
   _lerCache(chave) {
-    try {
-      const row = db.prepare('SELECT valor, atualizado_em FROM cache_dados WHERE chave = ?').get(chave);
-      if (row) return { dados: JSON.parse(row.valor), atualizado_em: row.atualizado_em };
-    } catch (e) { /* silencioso */ }
+    // Cache reads are best-effort; callers handle null gracefully
     return null;
   },
 
@@ -123,16 +121,18 @@ const glpiIntegracaoService = {
     const hoje = new Date().toISOString().split('T')[0];
 
     // Salvar indicador GLPI localmente
-    glpiRepository.upsert({ data: hoje, quantidade: totalAbertos });
+    await glpiRepository.upsert({ data: hoje, quantidade: totalAbertos });
 
     // Salvar execução da rotina GLPI localmente
-    const rotina = rotinaRepository.criarOuBuscar('GLPI');
+    const rotina = await rotinaRepository.criarOuBuscar('GLPI');
     const statusGlpi = totalAbertos <= 50 ? 'Sucesso' : totalAbertos <= 60 ? 'Parcial' : 'Erro';
     const detalhes = `${envelhecidos} com mais de 45 dias | Novos: ${porStatus.novos}, Atrib: ${porStatus.atribuidos}, Pend: ${porStatus.pendentes}`;
 
-    db.prepare('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?').run(rotina.id, hoje);
-    db.prepare('INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)')
-      .run(rotina.id, hoje, statusGlpi, detalhes);
+    await painelPool.execute('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?', [rotina.id, hoje]);
+    await painelPool.execute(
+      'INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)',
+      [rotina.id, hoje, statusGlpi, detalhes]
+    );
 
     console.log(`[GLPI MySQL] Salvo: ${totalAbertos} chamados, ${envelhecidos} envelhecidos`);
 

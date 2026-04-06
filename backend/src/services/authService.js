@@ -5,7 +5,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const usuarioRepository = require('../repositories/usuarioRepository');
-const { db } = require('../config/database');
+const { pool } = require('../config/database');
 const { getSecureEnv } = require('../config/crypto');
 require('dotenv').config();
 
@@ -15,7 +15,7 @@ const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const authService = {
   /** Realiza login e retorna token JWT */
   async login(email, senha) {
-    const usuario = usuarioRepository.buscarPorEmail(email);
+    const usuario = await usuarioRepository.buscarPorEmail(email);
     if (!usuario) {
       throw Object.assign(new Error('Email ou senha invalidos'), { statusCode: 401 });
     }
@@ -48,7 +48,7 @@ const authService = {
 
   /** Registra novo usuario */
   async registrar({ nome, email, senha }) {
-    const existente = usuarioRepository.buscarPorEmail(email);
+    const existente = await usuarioRepository.buscarPorEmail(email);
     if (existente) {
       throw Object.assign(new Error('Email ja cadastrado'), { statusCode: 409 });
     }
@@ -58,8 +58,8 @@ const authService = {
   },
 
   /** Retorna dados do usuario autenticado (nunca retorna senha_hash) */
-  perfil(id) {
-    const usuario = usuarioRepository.buscarPorIdSeguro(id);
+  async perfil(id) {
+    const usuario = await usuarioRepository.buscarPorIdSeguro(id);
     if (!usuario) {
       throw Object.assign(new Error('Usuario nao encontrado'), { statusCode: 404 });
     }
@@ -71,10 +71,11 @@ const authService = {
    * Deve ser chamado ao trocar senha, desativar conta, etc
    * @param {number} userId - ID do usuario
    */
-  invalidarTokens(userId) {
-    db.prepare(
-      'UPDATE usuarios SET token_invalidated_at = datetime("now") WHERE id = ?'
-    ).run(userId);
+  async invalidarTokens(userId) {
+    await pool.execute(
+      'UPDATE usuarios SET token_invalidated_at = NOW() WHERE id = ?',
+      [userId]
+    );
     console.log(`[Auth] Tokens invalidados para usuario ${userId}`);
   },
 
@@ -85,9 +86,8 @@ const authService = {
    * @param {string} novaSenha - nova senha
    */
   async alterarSenha(userId, senhaAtual, novaSenha) {
-    const usuario = usuarioRepository.buscarPorEmail(
-      usuarioRepository.buscarPorId(userId)?.email
-    );
+    const usuarioBase = await usuarioRepository.buscarPorId(userId);
+    const usuario = usuarioBase ? await usuarioRepository.buscarPorEmail(usuarioBase.email) : null;
     if (!usuario) {
       throw Object.assign(new Error('Usuario nao encontrado'), { statusCode: 404 });
     }
@@ -105,11 +105,13 @@ const authService = {
       throw Object.assign(new Error('Senha muito longa'), { statusCode: 400 });
     }
     const novaSenhaHash = await bcrypt.hash(novaSenha, 12);
-    db.prepare('UPDATE usuarios SET senha_hash = ?, atualizado_em = datetime("now") WHERE id = ?')
-      .run(novaSenhaHash, userId);
+    await pool.execute(
+      'UPDATE usuarios SET senha_hash = ?, atualizado_em = NOW() WHERE id = ?',
+      [novaSenhaHash, userId]
+    );
 
     // Invalidate all existing tokens so user must re-login
-    this.invalidarTokens(userId);
+    await this.invalidarTokens(userId);
 
     return { sucesso: true, mensagem: 'Senha alterada com sucesso' };
   },

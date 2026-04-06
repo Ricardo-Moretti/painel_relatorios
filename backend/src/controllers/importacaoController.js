@@ -7,13 +7,13 @@ const fs = require('fs');
 
 const importacaoController = {
   /** POST /api/importacao/upload */
-  upload(req, res, next) {
+  async upload(req, res, next) {
     try {
       if (!req.file) {
         return res.status(400).json({ sucesso: false, mensagem: 'Nenhum arquivo enviado' });
       }
 
-      const resultado = importacaoService.processar(
+      const resultado = await importacaoService.processar(
         req.file.path,
         req.file.originalname,
         req.usuario.id
@@ -37,9 +37,9 @@ const importacaoController = {
   },
 
   /** GET /api/importacao/historico */
-  historico(req, res, next) {
+  async historico(req, res, next) {
     try {
-      const dados = importacaoService.historico();
+      const dados = await importacaoService.historico();
       res.json({ sucesso: true, dados });
     } catch (error) {
       next(error);

@@ -4,7 +4,7 @@
  * Inclui verificacao de invalidacao de token (por troca de senha etc)
  */
 const jwt = require('jsonwebtoken');
-const { db } = require('../config/database');
+const { pool } = require('../config/database');
 const { getSecureEnv } = require('../config/crypto');
 require('dotenv').config();
 
@@ -18,7 +18,7 @@ if (!SECRET || SECRET.length < 32) {
  * Extrai dados do usuario e anexa ao request
  * Tambem verifica se o token foi invalidado (ex: troca de senha)
  */
-function autenticar(req, res, next) {
+async function autenticar(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -35,9 +35,11 @@ function autenticar(req, res, next) {
 
     // Check if token was invalidated (e.g., password change)
     try {
-      const usuario = db.prepare(
-        'SELECT token_invalidated_at FROM usuarios WHERE id = ?'
-      ).get(decoded.id);
+      const [rows] = await pool.execute(
+        'SELECT token_invalidated_at FROM usuarios WHERE id = ?',
+        [decoded.id]
+      );
+      const usuario = rows[0] || null;
 
       if (usuario && usuario.token_invalidated_at) {
         const invalidatedAt = new Date(usuario.token_invalidated_at).getTime() / 1000;

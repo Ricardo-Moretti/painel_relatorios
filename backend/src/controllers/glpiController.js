@@ -8,7 +8,7 @@ const glpiIntegracaoService = require('../services/glpiIntegracaoService');
 
 const glpiController = {
   /** POST /api/glpi */
-  inserir(req, res, next) {
+  async inserir(req, res, next) {
     try {
       const { data, quantidade } = req.body;
       if (!data || quantidade === undefined) {
@@ -23,7 +23,7 @@ const glpiController = {
       if (isNaN(qtd) || qtd < 0 || qtd > 100000) {
         return res.status(400).json({ sucesso: false, mensagem: 'Quantidade deve ser um numero entre 0 e 100000' });
       }
-      glpiRepository.upsert({ data, quantidade: qtd });
+      await glpiRepository.upsert({ data, quantidade: qtd });
       res.json({ sucesso: true, mensagem: 'Indicador GLPI salvo com sucesso' });
     } catch (error) {
       next(error);
@@ -31,7 +31,7 @@ const glpiController = {
   },
 
   /** GET /api/glpi */
-  listar(req, res, next) {
+  async listar(req, res, next) {
     try {
       const { dataInicio, dataFim } = req.query;
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -43,7 +43,7 @@ const glpiController = {
       }
       const inicio = dataInicio || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
       const fim = dataFim || new Date().toISOString().split('T')[0];
-      const dados = glpiRepository.buscarPorPeriodo(inicio, fim);
+      const dados = await glpiRepository.buscarPorPeriodo(inicio, fim);
       res.json({ sucesso: true, dados });
     } catch (error) {
       next(error);
@@ -51,10 +51,10 @@ const glpiController = {
   },
 
   /** GET /api/glpi/estatisticas */
-  estatisticas(req, res, next) {
+  async estatisticas(req, res, next) {
     try {
       const dias = Math.min(req.query.dias ? parseInt(req.query.dias) : 30, 365);
-      const dados = glpiRepository.estatisticas(dias);
+      const dados = await glpiRepository.estatisticas(dias);
       res.json({ sucesso: true, dados });
     } catch (error) {
       next(error);

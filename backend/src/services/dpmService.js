@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const rotinaRepository = require('../repositories/rotinaRepository');
-const { db } = require('../config/database');
+const { pool } = require('../config/database');
 
 // Configuracao
 const DPM_PATH = '//192.168.109.228/dtf/dpmext/salva';
@@ -98,7 +98,7 @@ const dpmService = {
    * Executa a verificação diária e registra no Painel
    * Verifica o dia anterior (DPM roda às 23h, verificamos no dia seguinte)
    */
-  verificacaoDiaria() {
+  async verificacaoDiaria() {
     const ontem = new Date();
     ontem.setDate(ontem.getDate() - 1);
     const dataStr = ontem.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -109,12 +109,14 @@ const dpmService = {
     const resultado = this.verificarArquivo(dataArquivo);
 
     // Registrar no Painel
-    const rotina = rotinaRepository.criarOuBuscar('DPM');
+    const rotina = await rotinaRepository.criarOuBuscar('DPM');
     const status = resultado.encontrado ? 'Sucesso' : 'Erro';
 
-    db.prepare('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?').run(rotina.id, dataStr);
-    db.prepare('INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)')
-      .run(rotina.id, dataStr, status, resultado.detalhes);
+    await pool.execute('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?', [rotina.id, dataStr]);
+    await pool.execute(
+      'INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)',
+      [rotina.id, dataStr, status, resultado.detalhes]
+    );
 
     console.log(`[DPM] ${dataStr}: ${status} — ${resultado.detalhes}`);
 
@@ -125,7 +127,7 @@ const dpmService = {
    * Verifica múltiplos dias (backfill)
    * Útil para preencher dias anteriores que não foram verificados
    */
-  verificarPeriodo(dias = 7) {
+  async verificarPeriodo(dias = 7) {
     const resultados = [];
     for (let i = 1; i <= dias; i++) {
       const d = new Date();
@@ -134,12 +136,14 @@ const dpmService = {
       const dataArquivo = dataStr.replace(/-/g, '');
 
       const resultado = this.verificarArquivo(dataArquivo);
-      const rotina = rotinaRepository.criarOuBuscar('DPM');
+      const rotina = await rotinaRepository.criarOuBuscar('DPM');
       const status = resultado.encontrado ? 'Sucesso' : 'Erro';
 
-      db.prepare('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?').run(rotina.id, dataStr);
-      db.prepare('INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)')
-        .run(rotina.id, dataStr, status, resultado.detalhes);
+      await pool.execute('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?', [rotina.id, dataStr]);
+      await pool.execute(
+        'INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)',
+        [rotina.id, dataStr, status, resultado.detalhes]
+      );
 
       resultados.push({ data: dataStr, status, detalhes: resultado.detalhes });
     }

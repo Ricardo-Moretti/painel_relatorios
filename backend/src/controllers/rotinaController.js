@@ -3,13 +3,14 @@
  * CRUD e consultas de rotinas e execuções
  */
 const rotinaRepository = require('../repositories/rotinaRepository');
+const { pool } = require('../config/database');
 // const dpmService = require('../services/dpmService'); // DPM desativado temporariamente
 
 const rotinaController = {
   /** GET /api/rotinas */
-  listar(req, res, next) {
+  async listar(req, res, next) {
     try {
-      const rotinas = rotinaRepository.listarTodas();
+      const rotinas = await rotinaRepository.listarTodas();
       res.json({ sucesso: true, dados: rotinas });
     } catch (error) {
       next(error);
@@ -17,13 +18,13 @@ const rotinaController = {
   },
 
   /** GET /api/rotinas/:id */
-  buscar(req, res, next) {
+  async buscar(req, res, next) {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id) || id < 1) {
         return res.status(400).json({ sucesso: false, mensagem: 'ID invalido' });
       }
-      const rotina = rotinaRepository.buscarPorId(id);
+      const rotina = await rotinaRepository.buscarPorId(id);
       if (!rotina) {
         return res.status(404).json({ sucesso: false, mensagem: 'Rotina nao encontrada' });
       }
@@ -34,7 +35,7 @@ const rotinaController = {
   },
 
   /** POST /api/rotinas */
-  criar(req, res, next) {
+  async criar(req, res, next) {
     try {
       const { nome, frequencia } = req.body;
       if (!nome || typeof nome !== 'string') {
@@ -49,7 +50,7 @@ const rotinaController = {
       if (frequencia && (typeof frequencia !== 'string' || frequencia.length > 50)) {
         return res.status(400).json({ sucesso: false, mensagem: 'Frequencia invalida' });
       }
-      const rotina = rotinaRepository.criar({ nome: nome.trim(), frequencia: frequencia ? frequencia.trim() : 'Diaria' });
+      const rotina = await rotinaRepository.criar({ nome: nome.trim(), frequencia: frequencia ? frequencia.trim() : 'Diaria' });
       res.status(201).json({ sucesso: true, dados: rotina });
     } catch (error) {
       next(error);
@@ -61,7 +62,7 @@ const rotinaController = {
    * Recebe: { rotina, data, status, detalhes }
    * Exemplo n8n: se arquivo DPM existe → status=Sucesso, senão → status=Erro
    */
-  webhook(req, res, next) {
+  async webhook(req, res, next) {
     try {
       const { rotina, data, status, detalhes } = req.body;
       if (!rotina || !status) {
@@ -88,12 +89,14 @@ const rotinaController = {
       const dataExec = data || new Date().toISOString().split('T')[0];
       const statusNorm = ['Sucesso', 'Erro', 'Parcial'].includes(status) ? status : 'Parcial';
 
-      const rotinaObj = rotinaRepository.criarOuBuscar(rotina);
+      const rotinaObj = await rotinaRepository.criarOuBuscar(rotina);
 
       // DELETE + INSERT para permitir atualização
-      const { db } = require('../config/database');
-      db.prepare('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?').run(rotinaObj.id, dataExec);
-      db.prepare('INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)').run(rotinaObj.id, dataExec, statusNorm, detalhes || '');
+      await pool.execute('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?', [rotinaObj.id, dataExec]);
+      await pool.execute(
+        'INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)',
+        [rotinaObj.id, dataExec, statusNorm, detalhes || '']
+      );
 
       console.log(`[Webhook] ${rotina} | ${dataExec} | ${statusNorm} | ${detalhes || ''}`);
       res.json({ sucesso: true, mensagem: `${rotina} registrado como ${statusNorm}`, dados: { rotina, data: dataExec, status: statusNorm } });
@@ -101,7 +104,7 @@ const rotinaController = {
   },
 
   /** POST /api/rotinas/registro-diario — preenchimento manual de todas as rotinas */
-  registroDiario(req, res, next) {
+  async registroDiario(req, res, next) {
     try {
       const { data, registros } = req.body;
       if (!data || !registros || !Array.isArray(registros)) {
@@ -130,38 +133,40 @@ const rotinaController = {
         }
       }
 
-      const { db } = require('../config/database');
       const glpiRepository = require('../repositories/glpiRepository');
-      let inseridos = 0, atualizados = 0;
+      let inseridos = 0;
 
-      const transacao = db.transaction(() => {
-        for (const reg of registros) {
-          if (!reg.rotina_id) continue;
+      for (const reg of registros) {
+        if (!reg.rotina_id) continue;
 
-          const rotina = rotinaRepository.buscarPorId(reg.rotina_id);
-          if (!rotina) continue;
+        const rotina = await rotinaRepository.buscarPorId(reg.rotina_id);
+        if (!rotina) continue;
 
-          // GLPI especial — quantidade numérica
-          if (rotina.nome.toUpperCase() === 'GLPI' && reg.quantidade != null) {
-            glpiRepository.upsert({ data, quantidade: parseInt(reg.quantidade) });
-            const statusGlpi = reg.quantidade <= 50 ? 'Sucesso' : reg.quantidade <= 60 ? 'Parcial' : 'Erro';
-            // DELETE + INSERT para permitir atualização
-            db.prepare('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?').run(reg.rotina_id, data);
-            db.prepare('INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)').run(reg.rotina_id, data, statusGlpi, reg.detalhes || `${reg.quantidade} chamados`);
-            inseridos++;
-            continue;
-          }
-
-          // Rotinas normais
-          if (!reg.status) continue;
+        // GLPI especial — quantidade numérica
+        if (rotina.nome.toUpperCase() === 'GLPI' && reg.quantidade != null) {
+          await glpiRepository.upsert({ data, quantidade: parseInt(reg.quantidade) });
+          const statusGlpi = reg.quantidade <= 50 ? 'Sucesso' : reg.quantidade <= 60 ? 'Parcial' : 'Erro';
           // DELETE + INSERT para permitir atualização
-          db.prepare('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?').run(reg.rotina_id, data);
-          db.prepare('INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)').run(reg.rotina_id, data, reg.status, reg.detalhes || '');
+          await pool.execute('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?', [reg.rotina_id, data]);
+          await pool.execute(
+            'INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)',
+            [reg.rotina_id, data, statusGlpi, reg.detalhes || `${reg.quantidade} chamados`]
+          );
           inseridos++;
+          continue;
         }
-      });
 
-      transacao();
+        // Rotinas normais
+        if (!reg.status) continue;
+        // DELETE + INSERT para permitir atualização
+        await pool.execute('DELETE FROM execucoes WHERE rotina_id = ? AND data_execucao = ?', [reg.rotina_id, data]);
+        await pool.execute(
+          'INSERT INTO execucoes (rotina_id, data_execucao, status, detalhes) VALUES (?, ?, ?, ?)',
+          [reg.rotina_id, data, reg.status, reg.detalhes || '']
+        );
+        inseridos++;
+      }
+
       res.json({ sucesso: true, dados: { inseridos }, mensagem: `${inseridos} registro(s) salvos` });
     } catch (error) { next(error); }
   },
@@ -192,7 +197,7 @@ const rotinaController = {
   // === FIM DPM DESATIVADO ===
 
   /** GET /api/rotinas/execucoes */
-  execucoes(req, res, next) {
+  async execucoes(req, res, next) {
     try {
       const { dataInicio, dataFim, rotinaId } = req.query;
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -206,7 +211,7 @@ const rotinaController = {
       if (rotinaId && (isNaN(parsedRotinaId) || parsedRotinaId < 1)) {
         return res.status(400).json({ sucesso: false, mensagem: 'rotinaId invalido' });
       }
-      const dados = rotinaRepository.buscarExecucoes({ dataInicio, dataFim, rotinaId: parsedRotinaId });
+      const dados = await rotinaRepository.buscarExecucoes({ dataInicio, dataFim, rotinaId: parsedRotinaId });
       res.json({ sucesso: true, dados });
     } catch (error) {
       next(error);

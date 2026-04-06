@@ -114,9 +114,6 @@ app.get('*', (req, res, next) => {
 // Error handler global
 app.use(errorHandler);
 
-// Inicializar banco e servidor
-inicializarBanco();
-
 // Agendamento automatico — coleta GLPI a cada hora
 const glpiIntegracaoService = require('./services/glpiIntegracaoService');
 
@@ -166,11 +163,17 @@ function agendarRelatorioDiario() {
   console.log('Relatorio diario agendado (18h seg-sex via n8n)');
 }
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
-  console.log(`API disponivel em http://localhost:${PORT}/api`);
-  agendarColetaGlpi();
-  agendarRelatorioDiario();
+// Inicializar banco e servidor
+inicializarBanco().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Servidor rodando em http://localhost:${PORT}`);
+    console.log(`API disponivel em http://localhost:${PORT}/api`);
+    agendarColetaGlpi();
+    agendarRelatorioDiario();
+  });
+}).catch(err => {
+  console.error('[FATAL] Falha ao inicializar banco:', err.message);
+  process.exit(1);
 });
 
 module.exports = app;

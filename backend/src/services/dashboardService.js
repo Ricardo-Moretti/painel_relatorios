@@ -4,13 +4,14 @@
  */
 const rotinaRepository = require('../repositories/rotinaRepository');
 const glpiRepository = require('../repositories/glpiRepository');
+const { pool } = require('../config/database');
 
 const dashboardService = {
   /**
    * Retorna dados completos do dashboard
    * Cards, gráficos, tabela analítica e alertas
    */
-  obterDados({ dataInicio, dataFim, dias = 30 }) {
+  async obterDados({ dataInicio, dataFim, dias = 30 }) {
     // Define período padrão se não informado
     if (!dataInicio) {
       const d = new Date();
@@ -22,10 +23,12 @@ const dashboardService = {
     }
 
     // Coleta dados brutos
-    const contagem = rotinaRepository.contarPorStatus({ dataInicio, dataFim });
-    const temporais = rotinaRepository.dadosTemporais(dias);
-    const performance = rotinaRepository.performancePorRotina({ dataInicio, dataFim });
-    const ultimasExecucoes = rotinaRepository.buscarUltimasExecucoes();
+    const [contagem, temporais, performance, ultimasExecucoes] = await Promise.all([
+      rotinaRepository.contarPorStatus({ dataInicio, dataFim }),
+      rotinaRepository.dadosTemporais(dias),
+      rotinaRepository.performancePorRotina({ dataInicio, dataFim }),
+      rotinaRepository.buscarUltimasExecucoes(),
+    ]);
 
     // Calcula totais
     const totais = { sucesso: 0, erro: 0, parcial: 0 };
@@ -49,7 +52,7 @@ const dashboardService = {
     };
 
     // Tabela analítica com tendência
-    const tabelaAnalitica = performance.map(r => {
+    const tabelaAnalitica = await Promise.all(performance.map(async (r) => {
       const tendencia = this._calcularTendencia(r.id, temporais);
       const scoreRotina = this._calcularScore({
         sucesso: r.sucesso,
@@ -61,7 +64,7 @@ const dashboardService = {
       // Se for GLPI, buscar quantidade de chamados do último dia
       let glpiQuantidade = null;
       if (r.nome.toUpperCase() === 'GLPI' && ultimaExec?.data_execucao) {
-        const glpiDia = glpiRepository.buscarPorPeriodo(ultimaExec.data_execucao, ultimaExec.data_execucao);
+        const glpiDia = await glpiRepository.buscarPorPeriodo(ultimaExec.data_execucao, ultimaExec.data_execucao);
         if (glpiDia.length > 0) glpiQuantidade = glpiDia[0].quantidade;
       }
 
@@ -81,7 +84,7 @@ const dashboardService = {
         ultimaExecucao: ultimaExec?.data_execucao || null,
         ultimaAtualizacao: ultimaExec?.data_importacao || ultimaExec?.data_execucao || null,
       };
-    });
+    }));
 
     // Dados para gráfico de pizza
     const pizza = [
@@ -91,13 +94,11 @@ const dashboardService = {
     ];
 
     // Resumo últimos 10 dias (seção da imagem de referência)
-    const resumo10dias = this._resumo10Dias();
-
-    // Heatmap 10 dias para exibir inline no dashboard
-    const heatmap10 = rotinaRepository.dadosHeatmap(10);
-
-    // GLPI últimos 10 dias
-    const glpi10dias = this._glpi10Dias();
+    const [resumo10dias, heatmap10, glpi10dias] = await Promise.all([
+      this._resumo10Dias(),
+      rotinaRepository.dadosHeatmap(10),
+      this._glpi10Dias(),
+    ]);
 
     return {
       cards,
@@ -159,11 +160,11 @@ const dashboardService = {
   },
 
   /** Retorna alertas inteligentes */
-  obterAlertas() {
+  async obterAlertas() {
     const alertas = [];
 
     // Erros consecutivos (2+ dias)
-    const errosConsec = rotinaRepository.errosConsecutivos();
+    const errosConsec = await rotinaRepository.errosConsecutivos();
     errosConsec.forEach(r => {
       alertas.push({
         tipo: 'critico',
@@ -174,7 +175,7 @@ const dashboardService = {
     });
 
     // Rotinas sem execução recente
-    const semExecucao = rotinaRepository.rotinasSemExecucao(3);
+    const semExecucao = await rotinaRepository.rotinasSemExecucao(3);
     semExecucao.forEach(r => {
       alertas.push({
         tipo: 'aviso',
@@ -189,14 +190,13 @@ const dashboardService = {
   },
 
   /** Resumo dos últimos 10 dias — contagem absoluta por status */
-  _resumo10Dias() {
-    const { db } = require('../config/database');
-    const rows = db.prepare(`
+  async _resumo10Dias() {
+    const [rows] = await pool.execute(`
       SELECT status, COUNT(*) as total
       FROM execucoes
-      WHERE data_execucao >= date('now', '-10 days')
+      WHERE data_execucao >= DATE_SUB(CURDATE(), INTERVAL 10 DAY)
       GROUP BY status
-    `).all();
+    `);
     const r = { sucesso: 0, erro: 0, parcial: 0 };
     rows.forEach(row => {
       if (row.status === 'Sucesso') r.sucesso = row.total;
@@ -220,11 +220,10 @@ const dashboardService = {
   },
 
   /** Análise mensal */
-  analiseMensal() {
-    const { db } = require('../config/database');
-    return db.prepare(`
+  async analiseMensal() {
+    const [rows] = await pool.execute(`
       SELECT
-        strftime('%Y-%m', data_execucao) as mes,
+        DATE_FORMAT(data_execucao, '%Y-%m') as mes,
         COUNT(*) as total,
         SUM(CASE WHEN status = 'Sucesso' THEN 1 ELSE 0 END) as sucesso,
         SUM(CASE WHEN status = 'Erro' THEN 1 ELSE 0 END) as erro,
@@ -233,27 +232,30 @@ const dashboardService = {
       GROUP BY mes
       ORDER BY mes DESC
       LIMIT 12
-    `).all();
+    `);
+    return rows;
   },
 
   /** Dados avançados para novos gráficos */
-  obterDadosAvancados({ dias = 30 }) {
+  async obterDadosAvancados({ dias = 30 }) {
     const d = new Date(); d.setDate(d.getDate() - dias);
     const dataInicio = d.toISOString().split('T')[0];
     const dataFim = new Date().toISOString().split('T')[0];
 
-    return {
-      streaks: rotinaRepository.diasSemErro(),
-      sla: rotinaRepository.slaDisponibilidade(dias),
-      taxaSucesso: rotinaRepository.taxaSucessoPorRotina({ dataInicio, dataFim }),
-      evolucaoDiaria: rotinaRepository.dadosTemporais(dias),
-    };
+    const [streaks, sla, taxaSucesso, evolucaoDiaria] = await Promise.all([
+      rotinaRepository.diasSemErro(),
+      rotinaRepository.slaDisponibilidade(dias),
+      rotinaRepository.taxaSucessoPorRotina({ dataInicio, dataFim }),
+      rotinaRepository.dadosTemporais(dias),
+    ]);
+
+    return { streaks, sla, taxaSucesso, evolucaoDiaria };
   },
 
-  obterHistoricoRotina(rotinaId, dias = 90) {
-    const rotina = rotinaRepository.buscarPorId(rotinaId);
+  async obterHistoricoRotina(rotinaId, dias = 90) {
+    const rotina = await rotinaRepository.buscarPorId(rotinaId);
     if (!rotina) return null;
-    const historico = rotinaRepository.historicoRotina(rotinaId, dias);
+    const historico = await rotinaRepository.historicoRotina(rotinaId, dias);
     return { rotina, historico };
   },
 
@@ -270,20 +272,20 @@ const dashboardService = {
   },
 
   /** Comparação entre período atual e anterior (BI) */
-  obterComparacao({ dias = 30 }) {
-    const { db } = require('../config/database');
+  async obterComparacao({ dias = 30 }) {
     const hoje = new Date().toISOString().split('T')[0];
     const d1 = new Date(); d1.setDate(d1.getDate() - dias);
     const inicioAtual = d1.toISOString().split('T')[0];
     const d2 = new Date(); d2.setDate(d2.getDate() - dias * 2);
     const inicioAnterior = d2.toISOString().split('T')[0];
 
-    const queryPeriodo = (inicio, fim) => {
-      const rows = db.prepare(`
-        SELECT status, COUNT(*) as total FROM execucoes
-        WHERE data_execucao >= ? AND data_execucao <= ?
-        GROUP BY status
-      `).all(inicio, fim);
+    const queryPeriodo = async (inicio, fim) => {
+      const [rows] = await pool.execute(
+        `SELECT status, COUNT(*) as total FROM execucoes
+         WHERE data_execucao >= ? AND data_execucao <= ?
+         GROUP BY status`,
+        [inicio, fim]
+      );
       const r = { sucesso: 0, erro: 0, parcial: 0 };
       rows.forEach(row => {
         if (row.status === 'Sucesso') r.sucesso = row.total;
@@ -295,24 +297,25 @@ const dashboardService = {
       return r;
     };
 
-    const atual = queryPeriodo(inicioAtual, hoje);
-    const anterior = queryPeriodo(inicioAnterior, inicioAtual);
-
-    // Comparação por rotina
-    const porRotina = db.prepare(`
-      SELECT r.nome,
-        SUM(CASE WHEN e.data_execucao >= ? AND e.status = 'Sucesso' THEN 1 ELSE 0 END) as suc_atual,
-        SUM(CASE WHEN e.data_execucao >= ? AND e.status = 'Erro' THEN 1 ELSE 0 END) as err_atual,
-        SUM(CASE WHEN e.data_execucao < ? AND e.data_execucao >= ? AND e.status = 'Sucesso' THEN 1 ELSE 0 END) as suc_anterior,
-        SUM(CASE WHEN e.data_execucao < ? AND e.data_execucao >= ? AND e.status = 'Erro' THEN 1 ELSE 0 END) as err_anterior,
-        COUNT(CASE WHEN e.data_execucao >= ? THEN 1 END) as total_atual,
-        COUNT(CASE WHEN e.data_execucao < ? AND e.data_execucao >= ? THEN 1 END) as total_anterior
-      FROM rotinas r
-      LEFT JOIN execucoes e ON e.rotina_id = r.id
-      WHERE r.ativa = 1
-      GROUP BY r.id
-      ORDER BY r.nome
-    `).all(inicioAtual, inicioAtual, inicioAtual, inicioAnterior, inicioAtual, inicioAnterior, inicioAtual, inicioAtual, inicioAnterior);
+    const [atual, anterior, [porRotina]] = await Promise.all([
+      queryPeriodo(inicioAtual, hoje),
+      queryPeriodo(inicioAnterior, inicioAtual),
+      pool.execute(
+        `SELECT r.nome,
+          SUM(CASE WHEN e.data_execucao >= ? AND e.status = 'Sucesso' THEN 1 ELSE 0 END) as suc_atual,
+          SUM(CASE WHEN e.data_execucao >= ? AND e.status = 'Erro' THEN 1 ELSE 0 END) as err_atual,
+          SUM(CASE WHEN e.data_execucao < ? AND e.data_execucao >= ? AND e.status = 'Sucesso' THEN 1 ELSE 0 END) as suc_anterior,
+          SUM(CASE WHEN e.data_execucao < ? AND e.data_execucao >= ? AND e.status = 'Erro' THEN 1 ELSE 0 END) as err_anterior,
+          COUNT(CASE WHEN e.data_execucao >= ? THEN 1 END) as total_atual,
+          COUNT(CASE WHEN e.data_execucao < ? AND e.data_execucao >= ? THEN 1 END) as total_anterior
+         FROM rotinas r
+         LEFT JOIN execucoes e ON e.rotina_id = r.id
+         WHERE r.ativa = 1
+         GROUP BY r.id, r.nome
+         ORDER BY r.nome`,
+        [inicioAtual, inicioAtual, inicioAtual, inicioAnterior, inicioAtual, inicioAnterior, inicioAtual, inicioAtual, inicioAnterior]
+      ),
+    ]);
 
     return {
       atual,
@@ -328,19 +331,22 @@ const dashboardService = {
   },
 
   /** Resumo multi-período (10d, 30d, 90d, mês atual) — suporta filtro por rotina */
-  obterResumoMultiPeriodo({ rotina } = {}) {
-    const { db } = require('../config/database');
+  async obterResumoMultiPeriodo({ rotina } = {}) {
     const mesAtual = new Date().toISOString().slice(0, 7);
 
-    const queryResumo = (where, params = []) => {
-      let joinRotina = '';
+    const queryResumo = async (where, params = []) => {
+      let sql;
+      let queryParams;
       if (rotina && rotina !== 'todas') {
-        joinRotina = ' JOIN rotinas r ON r.id = execucoes.rotina_id AND r.nome = ?';
-        params = [rotina, ...params];
+        sql = `SELECT status, COUNT(*) as total FROM execucoes
+               JOIN rotinas r ON r.id = execucoes.rotina_id AND r.nome = ?
+               WHERE ${where} GROUP BY status`;
+        queryParams = [rotina, ...params];
+      } else {
+        sql = `SELECT status, COUNT(*) as total FROM execucoes WHERE ${where} GROUP BY status`;
+        queryParams = params;
       }
-      const rows = db.prepare(`
-        SELECT status, COUNT(*) as total FROM execucoes${joinRotina} WHERE ${where} GROUP BY status
-      `).all(...params);
+      const [rows] = await pool.execute(sql, queryParams);
       const r = { sucesso: 0, erro: 0, parcial: 0 };
       rows.forEach(row => { r[row.status.toLowerCase()] = row.total; });
       r.total = r.sucesso + r.erro + r.parcial;
@@ -348,11 +354,18 @@ const dashboardService = {
       return r;
     };
 
+    const [d10, d30, d90, dMes] = await Promise.all([
+      queryResumo("data_execucao >= DATE_SUB(CURDATE(), INTERVAL 10 DAY)"),
+      queryResumo("data_execucao >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)"),
+      queryResumo("data_execucao >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)"),
+      queryResumo("DATE_FORMAT(data_execucao, '%Y-%m') = ?", [mesAtual]),
+    ]);
+
     return {
-      '10d': queryResumo("data_execucao >= date('now', '-10 days')"),
-      '30d': queryResumo("data_execucao >= date('now', '-30 days')"),
-      '90d': queryResumo("data_execucao >= date('now', '-90 days')"),
-      mesAtual: queryResumo("strftime('%Y-%m', data_execucao) = ?", [mesAtual]),
+      '10d': d10,
+      '30d': d30,
+      '90d': d90,
+      mesAtual: dMes,
     };
   },
 };

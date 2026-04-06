@@ -7,10 +7,10 @@ const XLSX = require('xlsx');
 const rotinaRepository = require('../repositories/rotinaRepository');
 const importacaoRepository = require('../repositories/importacaoRepository');
 const glpiRepository = require('../repositories/glpiRepository');
-const { db } = require('../config/database');
+const { pool } = require('../config/database');
 
 const importacaoService = {
-  processar(filePath, nomeArquivo, usuarioId) {
+  async processar(filePath, nomeArquivo, usuarioId) {
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
@@ -26,67 +26,65 @@ const importacaoService = {
     let inseridos = 0;
     let ignorados = 0;
 
-    const transacao = db.transaction(() => {
-      for (const linha of dados) {
-        const nomeRotina = this._extrairValor(linha, mapa.rotina);
-        const dataExecucao = this._extrairData(linha, mapa.data);
-        const statusRaw = mapa.status ? linha[mapa.status] : null;
-        const detalhes = mapa.detalhes ? (this._extrairValor(linha, mapa.detalhes) || '') : '';
+    for (const linha of dados) {
+      const nomeRotina = this._extrairValor(linha, mapa.rotina);
+      const dataExecucao = this._extrairData(linha, mapa.data);
+      const statusRaw = mapa.status ? linha[mapa.status] : null;
+      const detalhes = mapa.detalhes ? (this._extrairValor(linha, mapa.detalhes) || '') : '';
 
-        if (!nomeRotina || !dataExecucao) {
-          ignorados++;
-          continue;
-        }
-
-        // GLPI especial: status é número = quantidade de chamados
-        if (nomeRotina.toUpperCase() === 'GLPI' && typeof statusRaw === 'number') {
-          try {
-            const insertGlpi = db.prepare('INSERT OR REPLACE INTO indicadores_glpi (data, quantidade) VALUES (?, ?)');
-            insertGlpi.run(dataExecucao, statusRaw);
-
-            // Também inserir como execução para aparecer na tabela
-            const rotina = rotinaRepository.criarOuBuscar(nomeRotina);
-            // Status do GLPI: baseado na quantidade
-            const statusGlpi = statusRaw <= 30 ? 'Sucesso' : statusRaw <= 50 ? 'Parcial' : 'Erro';
-            rotinaRepository.inserirExecucao({
-              rotina_id: rotina.id,
-              data_execucao: dataExecucao,
-              status: statusGlpi,
-              detalhes: detalhes || `${statusRaw} chamados`,
-              origem_arquivo: nomeArquivo
-            });
-
-            inseridos++;
-          } catch (e) {
-            ignorados++;
-          }
-          continue;
-        }
-
-        // Rotinas normais
-        const status = this._normalizarStatus(statusRaw?.toString());
-        if (!status) {
-          ignorados++;
-          continue;
-        }
-
-        const rotina = rotinaRepository.criarOuBuscar(nomeRotina);
-        const foiInserido = rotinaRepository.inserirExecucao({
-          rotina_id: rotina.id,
-          data_execucao: dataExecucao,
-          status,
-          detalhes,
-          origem_arquivo: nomeArquivo
-        });
-
-        if (foiInserido) inseridos++;
-        else ignorados++;
+      if (!nomeRotina || !dataExecucao) {
+        ignorados++;
+        continue;
       }
-    });
 
-    transacao();
+      // GLPI especial: status é número = quantidade de chamados
+      if (nomeRotina.toUpperCase() === 'GLPI' && typeof statusRaw === 'number') {
+        try {
+          await pool.execute(
+            'REPLACE INTO indicadores_glpi (data, quantidade) VALUES (?, ?)',
+            [dataExecucao, statusRaw]
+          );
 
-    importacaoRepository.registrar({
+          // Também inserir como execução para aparecer na tabela
+          const rotina = await rotinaRepository.criarOuBuscar(nomeRotina);
+          // Status do GLPI: baseado na quantidade
+          const statusGlpi = statusRaw <= 30 ? 'Sucesso' : statusRaw <= 50 ? 'Parcial' : 'Erro';
+          await rotinaRepository.inserirExecucao({
+            rotina_id: rotina.id,
+            data_execucao: dataExecucao,
+            status: statusGlpi,
+            detalhes: detalhes || `${statusRaw} chamados`,
+            origem_arquivo: nomeArquivo
+          });
+
+          inseridos++;
+        } catch (e) {
+          ignorados++;
+        }
+        continue;
+      }
+
+      // Rotinas normais
+      const status = this._normalizarStatus(statusRaw?.toString());
+      if (!status) {
+        ignorados++;
+        continue;
+      }
+
+      const rotina = await rotinaRepository.criarOuBuscar(nomeRotina);
+      const foiInserido = await rotinaRepository.inserirExecucao({
+        rotina_id: rotina.id,
+        data_execucao: dataExecucao,
+        status,
+        detalhes,
+        origem_arquivo: nomeArquivo
+      });
+
+      if (foiInserido) inseridos++;
+      else ignorados++;
+    }
+
+    await importacaoRepository.registrar({
       nome_arquivo: nomeArquivo,
       registros_inseridos: inseridos,
       registros_ignorados: ignorados,

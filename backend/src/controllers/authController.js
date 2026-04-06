@@ -65,9 +65,9 @@ const authController = {
   },
 
   /** GET /api/auth/perfil */
-  perfil(req, res, next) {
+  async perfil(req, res, next) {
     try {
-      const usuario = authService.perfil(req.usuario.id);
+      const usuario = await authService.perfil(req.usuario.id);
       res.json({ sucesso: true, dados: usuario });
     } catch (error) {
       next(error);
