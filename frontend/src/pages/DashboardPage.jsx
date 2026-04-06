@@ -567,31 +567,37 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Layout TV 32" — 3 colunas */}
-          <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 340px', gap: '10px', alignItems: 'start' }}>
+          {/* BLOCO PRINCIPAL — visível sem scroll */}
 
-            {/* COLUNA 1 — KPIs + Donut + SLA + Streaks */}
+          {/* KPI Cards — linha compacta */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '10px' }}>
+            <KpiCard label="Total Execucoes" valor={cards?.totalRotinas || 0} cor="var(--blue)" />
+            <KpiCard label="Sucessos" valor={cards?.totalSucesso || 0} cor="var(--green)" variacao={v.sucesso} />
+            <KpiCard label="Parciais" valor={cards?.totalParcial || 0} cor="var(--amber)" />
+            <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
+          </div>
+
+          {/* Tabela + Heatmap lado a lado — destaque principal */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
+            <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
+          </div>
+
+          {/* BLOCO SECUNDÁRIO — scroll para ver */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+
+            {/* Análise por Período */}
+            <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
+
+            {/* Donut + Dias sem falha */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <KpiCard label="Total Execucoes" valor={cards?.totalRotinas || 0} cor="var(--blue)" />
-              <KpiCard label="Sucessos" valor={cards?.totalSucesso || 0} cor="var(--green)" variacao={v.sucesso} />
-              <KpiCard label="Parciais" valor={cards?.totalParcial || 0} cor="var(--amber)" />
-              <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
               <DonutDistribuicao dados={cards} />
-              <SlaCompacto dados={avancados?.sla || []} />
-            </div>
-
-            {/* COLUNA 2 — Tabela + Heatmap */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
-              <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
-              <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
-            </div>
-
-            {/* COLUNA 3 — Análise período + Streaks + Evolução */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
               <DiasSemFalha dados={avancados?.streaks || []} />
+            </div>
 
-              {/* Evolução Diária */}
+            {/* SLA + Evolução */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <SlaCompacto dados={avancados?.sla || []} />
               <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px', padding: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)' }}>Evolucao Diaria</h3>
@@ -609,7 +615,12 @@ export default function DashboardPage() {
                     <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barCategoryGap="35%">
                       <CartesianGrid vertical={false} stroke="#e5e9f2" />
                       <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} tickMargin={6}
-                        tickFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit' })} />
+                        tickFormatter={(val) => {
+                          if (!val || typeof val !== 'string') return ''
+                          const parts = val.split('-')
+                          if (parts.length !== 3) return val
+                          return `${parts[2]}/${parts[1]}`
+                        }} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
                       <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '11px' }} />
                       <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0,0,0,0]} barSize={10} />
