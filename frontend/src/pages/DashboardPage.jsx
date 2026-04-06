@@ -588,46 +588,48 @@ export default function DashboardPage() {
           </div>
 
           {/* ── ABAIXO DO FOLD — scroll para ver ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
 
-            {/* Col 1 — Análise por Período */}
+          {/* Linha 1: Análise por período (grande) + Donut (1/3) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px', marginBottom: '8px' }}>
             <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
+            <DonutDistribuicao dados={cards} />
+          </div>
 
-            {/* Col 2 — Donut + Streaks */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <DonutDistribuicao dados={cards} />
-              <DiasSemFalha dados={avancados?.streaks || []} />
-            </div>
+          {/* Linha 2: Dias sem Falha (full width) */}
+          <div style={{ marginBottom: '8px' }}>
+            <DiasSemFalha dados={avancados?.streaks || []} />
+          </div>
 
-            {/* Col 3 — SLA + Evolução diária */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <SlaCompacto dados={avancados?.sla || []} />
-              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px', padding: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)' }}>Evolucao Diaria</h3>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {[{ l: 'Sucesso', c: '#3794fc' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#dee5ef' }].map(({ l, c }) => (
-                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ width: '7px', height: '7px', borderRadius: '2px', backgroundColor: c }} />
-                        <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)' }}>{l}</span>
-                      </div>
-                    ))}
-                  </div>
+          {/* Linha 3: SLA (1/3) + Evolução Diária (2/3) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px' }}>
+
+            <SlaCompacto dados={avancados?.sla || []} />
+
+            <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px', padding: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)' }}>Evolucao Diaria</h3>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {[{ l: 'Sucesso', c: '#3794fc' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#dee5ef' }].map(({ l, c }) => (
+                    <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '2px', backgroundColor: c }} />
+                      <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)' }}>{l}</span>
+                    </div>
+                  ))}
                 </div>
-                <div style={{ height: '150px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barCategoryGap="35%">
-                      <CartesianGrid vertical={false} stroke="#e5e9f2" />
-                      <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} tickMargin={6}
-                        tickFormatter={(val) => val && val.length >= 10 ? val.substring(8,10)+'/'+val.substring(5,7) : ''} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
-                      <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '11px' }} />
-                      <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0,0,0,0]} barSize={10} />
-                      <Bar dataKey="erro" name="Erro" stackId="a" fill="#fc381d" radius={[0,0,0,0]} barSize={10} />
-                      <Bar dataKey="parcial" name="Parcial" stackId="a" fill="#dee5ef" radius={[3,3,0,0]} barSize={10} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+              </div>
+              <div style={{ height: '180px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 4, left: -20, bottom: 0 }} barCategoryGap="35%">
+                    <CartesianGrid vertical={false} stroke="#e5e9f2" />
+                    <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} tickMargin={6}
+                      tickFormatter={(val) => val && val.length >= 10 ? val.substring(8,10)+'/'+val.substring(5,7) : ''} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '11px' }} />
+                    <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0,0,0,0]} barSize={14} />
+                    <Bar dataKey="erro" name="Erro" stackId="a" fill="#fc381d" radius={[0,0,0,0]} barSize={14} />
+                    <Bar dataKey="parcial" name="Parcial" stackId="a" fill="#dee5ef" radius={[3,3,0,0]} barSize={14} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
 
