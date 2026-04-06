@@ -38,10 +38,10 @@ function KpiCard({ label, valor, cor, variacao }) {
     onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)' }}>
       {/* Gradient accent bar at top */}
       <div style={{ height: '3px', background: gradient, width: '100%' }} />
-      <div style={{ padding: '10px 16px' }}>
-        <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+      <div style={{ padding: '8px 12px' }}>
+        <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <p style={{ fontSize: '38px', fontWeight: 800, color: cor, lineHeight: 1, letterSpacing: '-0.02em' }}>{animatedValue}</p>
+          <p style={{ fontSize: '30px', fontWeight: 800, color: cor, lineHeight: 1, letterSpacing: '-0.02em' }}>{animatedValue}</p>
           {variacao !== undefined && variacao !== 0 && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: '3px',
@@ -543,97 +543,97 @@ export default function DashboardPage() {
       <Header titulo="Painel de Rotinas" subtitulo={`Ultimos ${dias} dias — ${new Date().toLocaleDateString('pt-BR')}`} />
 
       <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--bg-page)' }}>
-        <div ref={dashRef} className="page-content" style={{ maxWidth: '1920px', margin: '0 auto', padding: '16px 24px' }}>
+        <div ref={dashRef} className="page-content" style={{ maxWidth: '1920px', margin: '0 auto', padding: '10px 16px' }}>
 
           {/* Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', borderRadius: '12px', padding: '6px', boxShadow: 'var(--shadow-xs)' }}>
-              <Calendar style={{ width: '16px', height: '16px', margin: '0 10px', color: 'var(--text-muted)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', borderRadius: '10px', padding: '4px', boxShadow: 'var(--shadow-xs)' }}>
+              <Calendar style={{ width: '14px', height: '14px', margin: '0 8px', color: 'var(--text-muted)' }} />
               {[7, 15, 30, 60, 90].map(d => (
-                <button key={d} onClick={() => setDias(d)} style={{ padding: '7px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 150ms', backgroundColor: dias === d ? '#017efa' : 'transparent', color: dias === d ? '#ffffff' : 'var(--text-muted)' }}>{d}d</button>
+                <button key={d} onClick={() => setDias(d)} style={{ padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 150ms', backgroundColor: dias === d ? '#017efa' : 'transparent', color: dias === d ? '#ffffff' : 'var(--text-muted)' }}>{d}d</button>
               ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {ultimoRefresh && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  padding: '6px 14px', borderRadius: '999px',
-                  backgroundColor: 'var(--bg-inset)', border: '1px solid var(--border-light)',
-                  fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)',
-                }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '999px', backgroundColor: 'var(--bg-inset)', border: '1px solid var(--border-light)', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} />
                   Atualizado {ultimoRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
-              <button onClick={exportarPNG} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: 500, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-xs)', color: 'var(--text-secondary)', cursor: 'pointer', transition: 'all 200ms' }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-xs)' }}>
-                <Download style={{ width: '16px', height: '16px' }} /> Exportar PNG
+              <button onClick={exportarPNG} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: 500, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-xs)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <Download style={{ width: '13px', height: '13px' }} /> PNG
               </button>
               <ExportButton />
             </div>
           </div>
 
-          {/* KPI Cards */}
-          <div className="grid-4" style={{ marginBottom: '16px' }}>
-            <KpiCard label="Total Execucoes" valor={cards?.totalRotinas || 0} cor="var(--blue)" />
-            <KpiCard label="Sucessos" valor={cards?.totalSucesso || 0} cor="var(--green)" variacao={v.sucesso} />
-            <KpiCard label="Parciais" valor={cards?.totalParcial || 0} cor="var(--amber)" />
-            <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
-          </div>
+          {/* Layout TV: 2 colunas principais */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'start' }}>
 
-          {/* Tabela de Rotinas */}
-          <div style={{ marginBottom: '16px' }}>
-            <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
-          </div>
+            {/* COLUNA ESQUERDA */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-          {/* Análise por Período */}
-          <div style={{ marginBottom: '16px' }}>
-            <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
-          </div>
+              {/* KPI Cards — 4 em linha */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
+                <KpiCard label="Total Execucoes" valor={cards?.totalRotinas || 0} cor="var(--blue)" />
+                <KpiCard label="Sucessos" valor={cards?.totalSucesso || 0} cor="var(--green)" variacao={v.sucesso} />
+                <KpiCard label="Parciais" valor={cards?.totalParcial || 0} cor="var(--amber)" />
+                <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
+              </div>
 
-          {/* GLPI Heatmap */}
-          <div style={{ marginBottom: '16px' }}>
-            <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
-          </div>
+              {/* Tabela de Rotinas */}
+              <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
 
-          {/* Streaks + Donut */}
-          <div className="grid-1-1" style={{ marginBottom: '16px' }}>
-            <DiasSemFalha dados={avancados?.streaks || []} />
-            <DonutDistribuicao dados={cards} />
-          </div>
+              {/* Análise por Período */}
+              <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
 
-          {/* SLA + Evolução */}
-          <div className="grid-1-1" style={{ marginBottom: '16px' }}>
-            <SlaCompacto dados={avancados?.sla || []} />
+            </div>
 
-            {/* Evolução Diária — estilo Regal (barras empilhadas finas) */}
-            <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm), var(--glow-card)', borderRadius: '12px', padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-heading)' }}>Evolucao Diaria</h3>
-                <div style={{ display: 'flex', gap: '16px' }}>
-                  {[{ l: 'Sucesso', c: '#3794fc' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#dee5ef' }].map(({ l, c }) => (
-                    <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: c }} />
-                      <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)' }}>{l}</span>
+            {/* COLUNA DIREITA */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+              {/* GLPI Heatmap */}
+              <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
+
+              {/* Streaks + Donut lado a lado */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <DiasSemFalha dados={avancados?.streaks || []} />
+                <DonutDistribuicao dados={cards} />
+              </div>
+
+              {/* SLA + Evolução lado a lado */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <SlaCompacto dados={avancados?.sla || []} />
+
+                <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px', padding: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)' }}>Evolucao Diaria</h3>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      {[{ l: 'Sucesso', c: '#3794fc' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#dee5ef' }].map(({ l, c }) => (
+                        <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ width: '7px', height: '7px', borderRadius: '2px', backgroundColor: c }} />
+                          <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)' }}>{l}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                  <div style={{ height: '140px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barCategoryGap="35%">
+                        <CartesianGrid vertical={false} stroke="#e5e9f2" />
+                        <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} tickMargin={6}
+                          tickFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit' })} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
+                        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '11px' }} />
+                        <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0,0,0,0]} barSize={10} />
+                        <Bar dataKey="erro" name="Erro" stackId="a" fill="#fc381d" radius={[0,0,0,0]} barSize={10} />
+                        <Bar dataKey="parcial" name="Parcial" stackId="a" fill="#dee5ef" radius={[3,3,0,0]} barSize={10} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
-              <div style={{ height: '180px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barCategoryGap="35%">
-                    <CartesianGrid vertical={false} stroke="#e5e9f2" />
-                    <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickMargin={8}
-                      tickFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit' })} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '12px' }} />
-                    <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0, 0, 0, 0]} barSize={12} />
-                    <Bar dataKey="erro" name="Erro" stackId="a" fill="#fc381d" radius={[0, 0, 0, 0]} barSize={12} />
-                    <Bar dataKey="parcial" name="Parcial" stackId="a" fill="#dee5ef" radius={[3, 3, 0, 0]} barSize={12} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+
             </div>
           </div>
 
