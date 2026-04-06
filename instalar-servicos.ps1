@@ -72,9 +72,10 @@ Write-Host "`nInstalando servico Backend (porta 3001)..." -ForegroundColor Yello
 
 # ----- Servico Frontend -----
 Write-Host "Instalando servico Frontend (porta 3000)..." -ForegroundColor Yellow
-& $NssmPath install "PainelRotinas-Frontend" "cmd.exe"
+$NpmPath = (Get-Command npm).Source
+& $NssmPath install "PainelRotinas-Frontend" $NpmPath
 & $NssmPath set "PainelRotinas-Frontend" AppDirectory  $FrontendDir
-& $NssmPath set "PainelRotinas-Frontend" AppParameters "/c serve -s dist -l 3000"
+& $NssmPath set "PainelRotinas-Frontend" AppParameters "exec serve -- -s dist -l 3000"
 & $NssmPath set "PainelRotinas-Frontend" DisplayName   "Painel Rotinas - Frontend"
 & $NssmPath set "PainelRotinas-Frontend" Description   "Frontend React do Painel de Rotinas (porta 3000)"
 & $NssmPath set "PainelRotinas-Frontend" Start         SERVICE_AUTO_START
