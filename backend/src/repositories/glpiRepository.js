@@ -16,7 +16,7 @@ const glpiRepository = {
   /** Busca indicadores por período */
   async buscarPorPeriodo(dataInicio, dataFim) {
     const [rows] = await pool.execute(
-      'SELECT * FROM indicadores_glpi WHERE data >= ? AND data <= ? ORDER BY data ASC',
+      'SELECT DATE_FORMAT(data, \'%Y-%m-%d\') as data, quantidade FROM indicadores_glpi WHERE data >= ? AND data <= ? ORDER BY data ASC',
       [dataInicio, dataFim]
     );
     return rows;
@@ -48,7 +48,7 @@ const glpiRepository = {
   /** GLPI tendência com dados para chart */
   async buscarTendencia(dias = 90) {
     const [rows] = await pool.execute(
-      `SELECT data, quantidade
+      `SELECT DATE_FORMAT(data, '%Y-%m-%d') as data, quantidade
        FROM indicadores_glpi
        WHERE data >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
        ORDER BY data ASC`,
@@ -60,7 +60,7 @@ const glpiRepository = {
   /** GLPI envelhecimento — extrai número de detalhes "X com mais de 45 dias" */
   async buscarEnvelhecimento(dias = 30) {
     const [rows] = await pool.execute(
-      `SELECT e.data_execucao as data, e.detalhes,
+      `SELECT DATE_FORMAT(e.data_execucao, '%Y-%m-%d') as data, e.detalhes,
         CAST(SUBSTRING_INDEX(e.detalhes, ' ', 1) AS UNSIGNED) as envelhecidos
        FROM execucoes e
        JOIN rotinas r ON r.id = e.rotina_id

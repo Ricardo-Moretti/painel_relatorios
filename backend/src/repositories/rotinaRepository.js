@@ -48,7 +48,9 @@ const rotinaRepository = {
   /** Busca execuções por período */
   async buscarExecucoes({ dataInicio, dataFim, rotinaId }) {
     let query = `
-      SELECT e.*, r.nome as rotina_nome, r.frequencia
+      SELECT e.rotina_id, e.status, e.detalhes, e.origem_arquivo, e.data_importacao,
+             DATE_FORMAT(e.data_execucao, '%Y-%m-%d') as data_execucao,
+             r.nome as rotina_nome, r.frequencia
       FROM execucoes e
       JOIN rotinas r ON r.id = e.rotina_id
       WHERE 1=1
@@ -76,7 +78,9 @@ const rotinaRepository = {
   /** Busca última execução de cada rotina */
   async buscarUltimasExecucoes() {
     const [rows] = await pool.execute(`
-      SELECT e.*, r.nome as rotina_nome, r.frequencia
+      SELECT e.rotina_id, e.status, e.detalhes, e.origem_arquivo, e.data_importacao,
+             DATE_FORMAT(e.data_execucao, '%Y-%m-%d') as data_execucao,
+             r.nome as rotina_nome, r.frequencia
       FROM execucoes e
       JOIN rotinas r ON r.id = e.rotina_id
       WHERE e.data_execucao = (
@@ -102,7 +106,7 @@ const rotinaRepository = {
   /** Dados para gráfico temporal (últimos N dias) */
   async dadosTemporais(dias = 30) {
     const [rows] = await pool.execute(
-      `SELECT data_execucao as data,
+      `SELECT DATE_FORMAT(data_execucao, '%Y-%m-%d') as data,
         SUM(CASE WHEN status = 'Sucesso' THEN 1 ELSE 0 END) as sucesso,
         SUM(CASE WHEN status = 'Erro' THEN 1 ELSE 0 END) as erro,
         SUM(CASE WHEN status = 'Parcial' THEN 1 ELSE 0 END) as parcial
@@ -137,7 +141,7 @@ const rotinaRepository = {
   /** Dados para heatmap (rotina x dia) */
   async dadosHeatmap(dias = 30) {
     const [rows] = await pool.execute(
-      `SELECT r.nome as rotina, e.data_execucao as data, e.status
+      `SELECT r.nome as rotina, DATE_FORMAT(e.data_execucao, '%Y-%m-%d') as data, e.status
        FROM execucoes e
        JOIN rotinas r ON r.id = e.rotina_id
        WHERE e.data_execucao >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
@@ -236,7 +240,7 @@ const rotinaRepository = {
   /** Histórico completo de uma rotina */
   async historicoRotina(rotinaId, dias = 90) {
     const [rows] = await pool.execute(
-      `SELECT e.data_execucao as data, e.status, e.detalhes, e.data_importacao
+      `SELECT DATE_FORMAT(e.data_execucao, '%Y-%m-%d') as data, e.status, e.detalhes, e.data_importacao
        FROM execucoes e
        WHERE e.rotina_id = ?
          AND e.data_execucao >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
@@ -249,7 +253,7 @@ const rotinaRepository = {
   /** Dados para calendário heatmap de um mês (YYYY-MM) */
   async dadosCalendarioHeatmap(mes) {
     const [rows] = await pool.execute(
-      `SELECT e.data_execucao as data,
+      `SELECT DATE_FORMAT(e.data_execucao, '%Y-%m-%d') as data,
         SUM(CASE WHEN e.status = 'Sucesso' THEN 1 ELSE 0 END) as sucesso,
         SUM(CASE WHEN e.status = 'Erro' THEN 1 ELSE 0 END) as erro,
         SUM(CASE WHEN e.status = 'Parcial' THEN 1 ELSE 0 END) as parcial

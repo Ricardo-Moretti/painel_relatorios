@@ -9,7 +9,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import Header from '../components/layout/Header'
 import HistoricoDetalhe from '../components/dashboard/HistoricoDetalhe'
 import { dashboardAPI, glpiAPI } from '../services/api'
-import { formatarData } from '../lib/utils'
 import useToastStore from '../stores/toastStore'
 import useCountUp from '../hooks/useCountUp'
 import ExportButton from '../components/ui/ExportButton'
@@ -28,29 +27,30 @@ function KpiCard({ label, valor, cor, variacao }) {
   const gradient = GRADIENT_MAP[cor] || `linear-gradient(135deg, ${cor} 0%, ${cor} 100%)`
   return (
     <div style={{
-      backgroundColor: 'var(--bg-card)', borderRadius: '16px',
+      backgroundColor: 'var(--bg-card)', borderRadius: '12px',
       padding: '0',
       border: '1px solid var(--border-glow)',
-      boxShadow: 'var(--shadow-sm)', transition: 'all 250ms',
+      boxShadow: 'var(--shadow-sm)', transition: 'all 200ms',
       overflow: 'hidden', position: 'relative',
     }}
-    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)' }}
+    onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)' }}
     onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)' }}>
       {/* Gradient accent bar at top */}
       <div style={{ height: '3px', background: gradient, width: '100%' }} />
-      <div style={{ padding: '8px 12px' }}>
-        <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-          <p style={{ fontSize: '30px', fontWeight: 800, color: cor, lineHeight: 1, letterSpacing: '-0.02em' }}>{animatedValue}</p>
+      <div style={{ padding: '6px 12px 8px' }}>
+        <p style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</p>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+          <p style={{ fontSize: '26px', fontWeight: 800, color: cor, lineHeight: 1, letterSpacing: '-0.02em' }}>{animatedValue}</p>
           {variacao !== undefined && variacao !== 0 && (
             <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: '3px',
-              fontSize: '13px', fontWeight: 700, padding: '5px 12px', borderRadius: '10px',
+              display: 'inline-flex', alignItems: 'center', gap: '2px',
+              fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '8px',
               backgroundColor: variacao > 0 ? 'var(--green-subtle)' : 'var(--red-subtle)',
-              border: `1.5px solid ${variacao > 0 ? 'var(--green-border)' : 'var(--red-border)'}`,
+              border: `1px solid ${variacao > 0 ? 'var(--green-border)' : 'var(--red-border)'}`,
               color: variacao > 0 ? 'var(--green)' : 'var(--red)',
+              flexShrink: 0,
             }}>
-              {variacao > 0 ? <ArrowUpRight style={{ width: '16px', height: '16px' }} /> : <ArrowDownRight style={{ width: '16px', height: '16px' }} />}
+              {variacao > 0 ? <ArrowUpRight style={{ width: '12px', height: '12px' }} /> : <ArrowDownRight style={{ width: '12px', height: '12px' }} />}
               {Math.abs(variacao)}
             </span>
           )}
@@ -100,7 +100,7 @@ function TabelaRotinas({ dados = [], onClickRotina }) {
                   </span>
                 )}
               </td>
-              <td style={{ padding: '10px 16px', fontSize: '14px', color: 'var(--text-secondary)' }}>{r.ultimaAtualizacao || formatarData(r.ultimaExecucao)}</td>
+              <td style={{ padding: '10px 16px', fontSize: '14px', color: 'var(--text-secondary)' }}>{(() => { const v = r.ultimaAtualizacao || r.ultimaExecucao; return v && v.length >= 10 ? v.substring(8,10)+'/'+v.substring(5,7) : '-' })()}</td>
               <td style={{ padding: '10px 16px', fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.detalhes || '-'}</td>
             </tr>
           ))}
@@ -287,7 +287,7 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
             <th style={{ textAlign: 'left', padding: '8px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', width: '140px' }}>Rotina</th>
             {diasArray.map(d => (
               <th key={d} style={{ textAlign: 'center', padding: '12px 4px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
-                {new Date(d+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}
+                {d && d.length >= 10 ? d.substring(8,10)+'/'+d.substring(5,7) : d}
               </th>
             ))}
             <th style={{ textAlign: 'center', padding: '12px 12px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Resumo</th>
@@ -304,9 +304,10 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
                 {diasArray.map(d => {
                   // GLPI: cor baseada no número de chamados. Outras: cor baseada no status texto.
                   const corBolinha = isGlpi(rot) ? corGlpiBolinha(glpiMap[d]) : corC(porRotina[rot]?.[d])
+                  const dFmt = d && d.length >= 10 ? d.substring(8,10)+'/'+d.substring(5,7)+'/'+d.substring(0,4) : d
                   const tooltipText = isGlpi(rot)
-                    ? `GLPI — ${new Date(d+'T00:00:00').toLocaleDateString('pt-BR')} — ${glpiMap[d] != null ? glpiMap[d] + ' chamados' : 'Sem dados'}`
-                    : `${rot} — ${new Date(d+'T00:00:00').toLocaleDateString('pt-BR')} — ${porRotina[rot]?.[d] || 'Sem dados'}`
+                    ? `GLPI — ${dFmt} — ${glpiMap[d] != null ? glpiMap[d] + ' chamados' : 'Sem dados'}`
+                    : `${rot} — ${dFmt} — ${porRotina[rot]?.[d] || 'Sem dados'}`
                   const temErro = isGlpi(rot) ? (glpiMap[d] > 60) : (porRotina[rot]?.[d] === 'Erro')
                   return (
                     <td key={d} style={{ textAlign: 'center', padding: '12px 4px' }}>
@@ -543,60 +544,63 @@ export default function DashboardPage() {
       <Header titulo="Painel de Rotinas" subtitulo={`Ultimos ${dias} dias — ${new Date().toLocaleDateString('pt-BR')}`} />
 
       <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--bg-page)' }}>
-        <div ref={dashRef} className="page-content" style={{ maxWidth: '1920px', margin: '0 auto', padding: '10px 16px' }}>
+        <div ref={dashRef} className="page-content" style={{ maxWidth: '1920px', margin: '0 auto', padding: '8px 14px' }}>
 
-          {/* Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', borderRadius: '10px', padding: '4px', boxShadow: 'var(--shadow-xs)' }}>
-              <Calendar style={{ width: '14px', height: '14px', margin: '0 8px', color: 'var(--text-muted)' }} />
+          {/* ── Toolbar minimalista ── */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            {/* Seletor de período */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', borderRadius: '8px', padding: '3px', boxShadow: 'var(--shadow-xs)' }}>
+              <Calendar style={{ width: '13px', height: '13px', margin: '0 6px', color: 'var(--text-muted)', flexShrink: 0 }} />
               {[7, 15, 30, 60, 90].map(d => (
-                <button key={d} onClick={() => setDias(d)} style={{ padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 150ms', backgroundColor: dias === d ? '#017efa' : 'transparent', color: dias === d ? '#ffffff' : 'var(--text-muted)' }}>{d}d</button>
+                <button key={d} onClick={() => setDias(d)} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer', transition: 'all 130ms', backgroundColor: dias === d ? '#017efa' : 'transparent', color: dias === d ? '#fff' : 'var(--text-muted)' }}>{d}d</button>
               ))}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+            {/* Ações direita */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {ultimoRefresh && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '999px', backgroundColor: 'var(--bg-inset)', border: '1px solid var(--border-light)', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '999px', backgroundColor: 'var(--bg-inset)', border: '1px solid var(--border-light)', fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>
                   <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }} />
-                  Atualizado {ultimoRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  {ultimoRefresh.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
-              <button onClick={exportarPNG} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: 500, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-xs)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                <Download style={{ width: '13px', height: '13px' }} /> PNG
+              <button onClick={exportarPNG} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 500, backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-xs)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                <Download style={{ width: '12px', height: '12px' }} /> PNG
               </button>
               <ExportButton />
             </div>
           </div>
 
-          {/* BLOCO PRINCIPAL — visível sem scroll */}
+          {/* ── ACIMA DO FOLD — sem scroll em 1080p ── */}
 
-          {/* KPI Cards — linha compacta */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '10px' }}>
+          {/* KPI Cards — linha única super compacta */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '8px' }}>
             <KpiCard label="Total Execucoes" valor={cards?.totalRotinas || 0} cor="var(--blue)" />
             <KpiCard label="Sucessos" valor={cards?.totalSucesso || 0} cor="var(--green)" variacao={v.sucesso} />
             <KpiCard label="Parciais" valor={cards?.totalParcial || 0} cor="var(--amber)" />
             <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
           </div>
 
-          {/* Tabela + Heatmap lado a lado — destaque principal */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+          {/* Tabela + Heatmap 50/50 — foco visual principal */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
             <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
           </div>
 
-          {/* BLOCO SECUNDÁRIO — scroll para ver */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+          {/* ── ABAIXO DO FOLD — scroll para ver ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
 
-            {/* Análise por Período */}
+            {/* Col 1 — Análise por Período */}
             <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
 
-            {/* Donut + Dias sem falha */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Col 2 — Donut + Streaks */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <DonutDistribuicao dados={cards} />
               <DiasSemFalha dados={avancados?.streaks || []} />
             </div>
 
-            {/* SLA + Evolução */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Col 3 — SLA + Evolução diária */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <SlaCompacto dados={avancados?.sla || []} />
               <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px', padding: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -615,12 +619,7 @@ export default function DashboardPage() {
                     <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barCategoryGap="35%">
                       <CartesianGrid vertical={false} stroke="#e5e9f2" />
                       <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} tickMargin={6}
-                        tickFormatter={(val) => {
-                          if (!val || typeof val !== 'string') return ''
-                          const parts = val.split('-')
-                          if (parts.length !== 3) return val
-                          return `${parts[2]}/${parts[1]}`
-                        }} />
+                        tickFormatter={(val) => val && val.length >= 10 ? val.substring(8,10)+'/'+val.substring(5,7) : ''} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
                       <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '11px' }} />
                       <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0,0,0,0]} barSize={10} />
