@@ -152,9 +152,12 @@ function agendarRelatorioDiario() {
     if (hora === 17 && minuto === 40 && diaSemana >= 1 && diaSemana <= 5) {
       console.log('[Relatorio] Disparando relatório diário...');
       glpiIntegracaoService.relatorioDiario()
-        .then(dados => emailService.enviarRelatorioDiario(dados))
+        .then(dados => {
+          console.log('[Relatorio] Dados coletados:', JSON.stringify(dados.resumo));
+          return emailService.enviarRelatorioDiario(dados);
+        })
         .then(() => console.log('[Relatorio] Enviado para n8n com sucesso'))
-        .catch(e => console.log(`[Relatorio] Falhou: ${e.message}`));
+        .catch(e => console.error(`[Relatorio] Falhou: ${e.message}`, e.stack));
     }
   }
 

@@ -673,34 +673,37 @@ const glpiIntegracaoService = {
       WHERE DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}`);
     const slaAtenPct = slaAtenHoje[0].total > 0 ? +(((slaAtenHoje[0].total - parseInt(slaAtenHoje[0].fora || 0)) / slaAtenHoje[0].total) * 100).toFixed(1) : 0;
 
+    // MySQL2 retorna COUNT(*) como BigInt — parseInt() garante serialização JSON correta
+    const n = (v) => parseInt(v) || 0;
+
     return {
       data: new Date().toISOString().split('T')[0],
       dataFormatada: new Date().toLocaleDateString('pt-BR'),
       resumo: {
-        abertos: abertos[0].total,
-        envelhecidos: envelhecidos[0].total,
-        abertosHoje: abertosHoje[0].total,
-        solucionadosHoje: solucionadosHoje[0].total,
-        fechadosHoje: fechadosHoje[0].total,
-        reabertosHoje: reabertosHoje[0].total,
+        abertos: n(abertos[0].total),
+        envelhecidos: n(envelhecidos[0].total),
+        abertosHoje: n(abertosHoje[0].total),
+        solucionadosHoje: n(solucionadosHoje[0].total),
+        fechadosHoje: n(fechadosHoje[0].total),
+        reabertosHoje: n(reabertosHoje[0].total),
         slaPct,
         slaAtenPct,
-        tempoMedioHoje: tempoHoje[0].media || 0,
-        tempoRespostaHoje: tempoRespostaHoje[0].media || 0,
-        vpnHoje: vpnHoje[0].total,
-        vpnAbertos: vpnAbertos[0].total,
-        resetSenhaHoje: resetHoje[0].total,
-        abertosOntem: abertosOntem[0].total,
-        solucionadosOntem: solucionadosOntem[0].total,
+        tempoMedioHoje: parseFloat(tempoHoje[0].media) || 0,
+        tempoRespostaHoje: parseFloat(tempoRespostaHoje[0].media) || 0,
+        vpnHoje: n(vpnHoje[0].total),
+        vpnAbertos: n(vpnAbertos[0].total),
+        resetSenhaHoje: n(resetHoje[0].total),
+        abertosOntem: n(abertosOntem[0].total),
+        solucionadosOntem: n(solucionadosOntem[0].total),
       },
       porStatus: {
-        novos: parseInt(porStatus[0].novos) || 0,
-        atribuidos: parseInt(porStatus[0].atribuidos) || 0,
-        planejados: parseInt(porStatus[0].planejados) || 0,
-        pendentes: parseInt(porStatus[0].pendentes) || 0,
+        novos: n(porStatus[0].novos),
+        atribuidos: n(porStatus[0].atribuidos),
+        planejados: n(porStatus[0].planejados),
+        pendentes: n(porStatus[0].pendentes),
       },
-      categoriasHoje: categoriasHoje.map(c => ({ categoria: c.categoria.split(' > ').pop(), qtd: c.qtd })),
-      atendentesHoje: atendentesHoje.map(a => ({ nome: a.nome.trim(), resolvidos: a.resolvidos })),
+      categoriasHoje: categoriasHoje.map(c => ({ categoria: c.categoria.split(' > ').pop(), qtd: n(c.qtd) })),
+      atendentesHoje: atendentesHoje.map(a => ({ nome: a.nome.trim(), resolvidos: n(a.resolvidos) })),
     };
   },
 
