@@ -16,13 +16,12 @@ const importacaoRepository = {
 
   /** Lista histórico de importações */
   async listarHistorico(limite = 50) {
-    const [rows] = await pool.execute(
+    const [rows] = await pool.query(
       `SELECT i.*, u.nome as usuario_nome
        FROM importacoes i
        LEFT JOIN usuarios u ON u.id = i.usuario_id
        ORDER BY i.data_importacao DESC
-       LIMIT ?`,
-      [limite]
+       LIMIT ${parseInt(limite)}`
     );
     return rows;
   }

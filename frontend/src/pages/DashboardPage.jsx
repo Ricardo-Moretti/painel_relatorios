@@ -567,74 +567,60 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Layout TV: 2 colunas principais */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', alignItems: 'start' }}>
+          {/* Layout TV 32" — 3 colunas */}
+          <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 340px', gap: '10px', alignItems: 'start' }}>
 
-            {/* COLUNA ESQUERDA */}
+            {/* COLUNA 1 — KPIs + Donut + SLA + Streaks */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-              {/* KPI Cards — 4 em linha */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px' }}>
-                <KpiCard label="Total Execucoes" valor={cards?.totalRotinas || 0} cor="var(--blue)" />
-                <KpiCard label="Sucessos" valor={cards?.totalSucesso || 0} cor="var(--green)" variacao={v.sucesso} />
-                <KpiCard label="Parciais" valor={cards?.totalParcial || 0} cor="var(--amber)" />
-                <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
-              </div>
-
-              {/* Tabela de Rotinas */}
-              <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
-
-              {/* Análise por Período */}
-              <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
-
+              <KpiCard label="Total Execucoes" valor={cards?.totalRotinas || 0} cor="var(--blue)" />
+              <KpiCard label="Sucessos" valor={cards?.totalSucesso || 0} cor="var(--green)" variacao={v.sucesso} />
+              <KpiCard label="Parciais" valor={cards?.totalParcial || 0} cor="var(--amber)" />
+              <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
+              <DonutDistribuicao dados={cards} />
+              <SlaCompacto dados={avancados?.sla || []} />
             </div>
 
-            {/* COLUNA DIREITA */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-              {/* GLPI Heatmap */}
+            {/* COLUNA 2 — Tabela + Heatmap */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
+              <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
               <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
+            </div>
 
-              {/* Streaks + Donut lado a lado */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <DiasSemFalha dados={avancados?.streaks || []} />
-                <DonutDistribuicao dados={cards} />
-              </div>
+            {/* COLUNA 3 — Análise período + Streaks + Evolução */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <ResumoMulti dados={resumoMulti} rotinas={(tabelaAnalitica || []).map(r => r.nome)} />
+              <DiasSemFalha dados={avancados?.streaks || []} />
 
-              {/* SLA + Evolução lado a lado */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <SlaCompacto dados={avancados?.sla || []} />
-
-                <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px', padding: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)' }}>Evolucao Diaria</h3>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      {[{ l: 'Sucesso', c: '#3794fc' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#dee5ef' }].map(({ l, c }) => (
-                        <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ width: '7px', height: '7px', borderRadius: '2px', backgroundColor: c }} />
-                          <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)' }}>{l}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ height: '140px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barCategoryGap="35%">
-                        <CartesianGrid vertical={false} stroke="#e5e9f2" />
-                        <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} tickMargin={6}
-                          tickFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit' })} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
-                        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '11px' }} />
-                        <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0,0,0,0]} barSize={10} />
-                        <Bar dataKey="erro" name="Erro" stackId="a" fill="#fc381d" radius={[0,0,0,0]} barSize={10} />
-                        <Bar dataKey="parcial" name="Parcial" stackId="a" fill="#dee5ef" radius={[3,3,0,0]} barSize={10} />
-                      </BarChart>
-                    </ResponsiveContainer>
+              {/* Evolução Diária */}
+              <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm)', borderRadius: '12px', padding: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-heading)' }}>Evolucao Diaria</h3>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[{ l: 'Sucesso', c: '#3794fc' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#dee5ef' }].map(({ l, c }) => (
+                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '7px', height: '7px', borderRadius: '2px', backgroundColor: c }} />
+                        <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)' }}>{l}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+                <div style={{ height: '150px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={avancados?.evolucaoDiaria || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} barCategoryGap="35%">
+                      <CartesianGrid vertical={false} stroke="#e5e9f2" />
+                      <XAxis dataKey="data" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} tickMargin={6}
+                        tickFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit' })} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-md)', fontSize: '11px' }} />
+                      <Bar dataKey="sucesso" name="Sucesso" stackId="a" fill="#3794fc" radius={[0,0,0,0]} barSize={10} />
+                      <Bar dataKey="erro" name="Erro" stackId="a" fill="#fc381d" radius={[0,0,0,0]} barSize={10} />
+                      <Bar dataKey="parcial" name="Parcial" stackId="a" fill="#dee5ef" radius={[3,3,0,0]} barSize={10} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-
             </div>
+
           </div>
 
         </div>
