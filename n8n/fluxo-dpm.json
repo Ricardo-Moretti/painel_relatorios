@@ -1,0 +1,234 @@
+{
+  "name": "DPM - Verificação Diária (Autônomo)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 5 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "⏰ Todo dia 5h (seg-sex)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==========================================\n// VERIFICAÇÃO DPM — AUTÔNOMO (sem backend)\n// Acessa a pasta de rede diretamente\n// ==========================================\n\nconst fs = require('fs');\n\n// Configuração\nconst DPM_PATH = '//192.168.109.228/dtf/dpmext/salva';\nconst DPM_PREFIX = 'DLR2JD_DPMEXT_D_201077_';\n\n// Data de ontem (DPM roda às 23h)\nconst ontem = new Date();\nontem.setDate(ontem.getDate() - 1);\nconst ano = ontem.getFullYear();\nconst mes = String(ontem.getMonth() + 1).padStart(2, '0');\nconst dia = String(ontem.getDate()).padStart(2, '0');\nconst dataArquivo = `${ano}${mes}${dia}`;\nconst dataFormatada = `${dia}/${mes}/${ano}`;\nconst dataISO = `${ano}-${mes}-${dia}`;\n\ntry {\n  const files = fs.readdirSync(DPM_PATH);\n  const encontrados = files.filter(f => f.startsWith(DPM_PREFIX) && f.includes(dataArquivo));\n\n  if (encontrados.length > 0) {\n    const ultimo = encontrados.sort().pop();\n    const horario = ultimo.match(/_(\\d{6})\\.DPM$/);\n    const horaStr = horario ? `${horario[1].slice(0,2)}:${horario[1].slice(2,4)}:${horario[1].slice(4,6)}` : 'N/A';\n\n    return [{\n      json: {\n        status: 'Sucesso',\n        data: dataISO,\n        dataFormatada,\n        arquivo: ultimo,\n        totalArquivos: encontrados.length,\n        horarioGeracao: horaStr,\n        detalhes: `Arquivo DPM gerado às ${horaStr} (${encontrados.length} arquivo(s) no dia)`,\n        pastaAcessivel: true\n      }\n    }];\n  }\n\n  return [{\n    json: {\n      status: 'Erro',\n      data: dataISO,\n      dataFormatada,\n      arquivo: null,\n      totalArquivos: 0,\n      horarioGeracao: null,\n      detalhes: `Arquivo DPM NÃO encontrado para ${dataFormatada}`,\n      pastaAcessivel: true\n    }\n  }];\n\n} catch (e) {\n  return [{\n    json: {\n      status: 'Erro',\n      data: dataISO,\n      dataFormatada,\n      arquivo: null,\n      totalArquivos: 0,\n      horarioGeracao: null,\n      detalhes: `Erro ao acessar pasta DPM: ${e.message}`,\n      pastaAcessivel: false\n    }\n  }];\n}"
+      },
+      "id": "verificar-arquivo",
+      "name": "🔍 Verificar arquivo DPM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-status",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "Sucesso",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "verificar-resultado",
+      "name": "📂 DPM gerou?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "painel-rotinas@tracbel.com.br",
+        "toEmail": "ricardo.moretti@tracbel.com.br, hugo.rocha@tracbel.com.br, athaide.matos@tracbel.com.br",
+        "subject": "=✅ DPM - Arquivo gerado com sucesso ({{ $('🔍 Verificar arquivo DPM').item.json.dataFormatada }})",
+        "emailType": "html",
+        "html": "=<div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background: linear-gradient(135deg, #16a34a, #22d3ee); padding: 28px 32px; border-radius: 16px 16px 0 0;\">\n    <h2 style=\"color: white; margin: 0; font-size: 22px;\">✅ DPM — Gerado com Sucesso</h2>\n    <p style=\"color: rgba(255,255,255,0.8); margin: 6px 0 0; font-size: 14px;\">Verificação automática — n8n</p>\n  </div>\n  <div style=\"background: #ffffff; padding: 28px 32px; border: 1px solid #e2e8f0; border-top: none;\">\n    <p style=\"font-size: 16px; color: #1e293b; margin: 0 0 20px;\">O arquivo DPM foi <strong style=\"color: #16a34a;\">gerado com sucesso</strong>.</p>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"border-bottom: 1px solid #f1f5f9;\"><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Data referência</td><td style=\"padding: 12px 0; font-weight: 700; font-size: 14px; text-align: right;\">{{ $('🔍 Verificar arquivo DPM').item.json.dataFormatada }}</td></tr>\n      <tr style=\"border-bottom: 1px solid #f1f5f9;\"><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Arquivo</td><td style=\"padding: 12px 0; font-weight: 700; font-size: 13px; text-align: right; font-family: monospace;\">{{ $('🔍 Verificar arquivo DPM').item.json.arquivo }}</td></tr>\n      <tr style=\"border-bottom: 1px solid #f1f5f9;\"><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Horário geração</td><td style=\"padding: 12px 0; font-weight: 700; font-size: 14px; text-align: right;\">{{ $('🔍 Verificar arquivo DPM').item.json.horarioGeracao }}</td></tr>\n      <tr style=\"border-bottom: 1px solid #f1f5f9;\"><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Qtd arquivos no dia</td><td style=\"padding: 12px 0; font-weight: 700; font-size: 14px; text-align: right;\">{{ $('🔍 Verificar arquivo DPM').item.json.totalArquivos }}</td></tr>\n      <tr><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Verificado em</td><td style=\"padding: 12px 0; font-size: 14px; text-align: right;\">{{ new Date().toLocaleString('pt-BR') }}</td></tr>\n    </table>\n  </div>\n  <div style=\"background: #f8f9fc; padding: 16px 32px; border-radius: 0 0 16px 16px; border: 1px solid #e2e8f0; border-top: none;\">\n    <p style=\"font-size: 11px; color: #94a3b8; margin: 0; text-align: center;\">Painel de Rotinas — Verificação automática via n8n</p>\n  </div>\n</div>"
+      },
+      "id": "email-sucesso",
+      "name": "📧 Email Sucesso",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [960, 180]
+    },
+    {
+      "parameters": {
+        "fromEmail": "painel-rotinas@tracbel.com.br",
+        "toEmail": "ricardo.moretti@tracbel.com.br, hugo.rocha@tracbel.com.br, athaide.matos@tracbel.com.br",
+        "subject": "=🔴 DPM - FALHA! Arquivo NÃO gerado ({{ $('🔍 Verificar arquivo DPM').item.json.dataFormatada }})",
+        "emailType": "html",
+        "html": "=<div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background: linear-gradient(135deg, #ef4444, #f97316); padding: 28px 32px; border-radius: 16px 16px 0 0;\">\n    <h2 style=\"color: white; margin: 0; font-size: 22px;\">🔴 DPM — FALHA</h2>\n    <p style=\"color: rgba(255,255,255,0.8); margin: 6px 0 0; font-size: 14px;\">Verificação automática — n8n</p>\n  </div>\n  <div style=\"background: #ffffff; padding: 28px 32px; border: 1px solid #e2e8f0; border-top: none;\">\n    <p style=\"font-size: 16px; color: #1e293b; margin: 0 0 20px;\">O arquivo DPM <strong style=\"color: #ef4444;\">NÃO foi encontrado</strong> para a data de referência.</p>\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"border-bottom: 1px solid #f1f5f9;\"><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Data referência</td><td style=\"padding: 12px 0; font-weight: 700; font-size: 14px; text-align: right; color: #ef4444;\">{{ $('🔍 Verificar arquivo DPM').item.json.dataFormatada }}</td></tr>\n      <tr style=\"border-bottom: 1px solid #f1f5f9;\"><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Detalhes</td><td style=\"padding: 12px 0; font-size: 14px; text-align: right;\">{{ $('🔍 Verificar arquivo DPM').item.json.detalhes }}</td></tr>\n      <tr style=\"border-bottom: 1px solid #f1f5f9;\"><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Pasta acessível</td><td style=\"padding: 12px 0; font-size: 14px; text-align: right;\">{{ $('🔍 Verificar arquivo DPM').item.json.pastaAcessivel ? 'Sim' : 'NÃO — verificar rede' }}</td></tr>\n      <tr><td style=\"padding: 12px 0; color: #64748b; font-size: 14px;\">Verificado em</td><td style=\"padding: 12px 0; font-size: 14px; text-align: right;\">{{ new Date().toLocaleString('pt-BR') }}</td></tr>\n    </table>\n    <div style=\"background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin-top: 20px; border-radius: 0 8px 8px 0;\">\n      <p style=\"color: #ef4444; font-weight: 700; margin: 0; font-size: 14px;\">⚠️ Ação necessária</p>\n      <p style=\"color: #7f1d1d; margin: 6px 0 0; font-size: 13px;\">Verifique o servidor DPM (192.168.109.228) e o agendamento da rotina das 23h.</p>\n    </div>\n  </div>\n  <div style=\"background: #f8f9fc; padding: 16px 32px; border-radius: 0 0 16px 16px; border: 1px solid #e2e8f0; border-top: none;\">\n    <p style=\"font-size: 11px; color: #94a3b8; margin: 0; text-align: center;\">Painel de Rotinas — Verificação automática via n8n</p>\n  </div>\n</div>"
+      },
+      "id": "email-erro",
+      "name": "📧 Email ALERTA",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [960, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/rotinas/webhook",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"rotina\": \"DPM\",\n  \"data\": \"{{ $('🔍 Verificar arquivo DPM').item.json.data }}\",\n  \"status\": \"{{ $('🔍 Verificar arquivo DPM').item.json.status }}\",\n  \"detalhes\": \"{{ $('🔍 Verificar arquivo DPM').item.json.detalhes }}\"\n}",
+        "options": {
+          "timeout": 5000,
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "registrar-painel-sucesso",
+      "name": "💾 Registrar no Painel (opcional)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 180],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/rotinas/webhook",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"rotina\": \"DPM\",\n  \"data\": \"{{ $('🔍 Verificar arquivo DPM').item.json.data }}\",\n  \"status\": \"{{ $('🔍 Verificar arquivo DPM').item.json.status }}\",\n  \"detalhes\": \"{{ $('🔍 Verificar arquivo DPM').item.json.detalhes }}\"\n}",
+        "options": {
+          "timeout": 5000,
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "registrar-painel-erro",
+      "name": "💾 Registrar no Painel (opcional)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 420],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "▶️ Teste manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 480]
+    }
+  ],
+  "connections": {
+    "⏰ Todo dia 5h (seg-sex)": {
+      "main": [
+        [
+          {
+            "node": "🔍 Verificar arquivo DPM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Verificar arquivo DPM": {
+      "main": [
+        [
+          {
+            "node": "📂 DPM gerou?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📂 DPM gerou?": {
+      "main": [
+        [
+          {
+            "node": "📧 Email Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📧 Email ALERTA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📧 Email Sucesso": {
+      "main": [
+        [
+          {
+            "node": "💾 Registrar no Painel (opcional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📧 Email ALERTA": {
+      "main": [
+        [
+          {
+            "node": "💾 Registrar no Painel (opcional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "▶️ Teste manual": {
+      "main": [
+        [
+          {
+            "node": "🔍 Verificar arquivo DPM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

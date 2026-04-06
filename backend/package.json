@@ -1,0 +1,24 @@
+{
+  "name": "painel-rotinas-backend",
+  "version": "1.0.0",
+  "description": "Backend do Painel de Rotinas - Dashboard SaaS para gestão operacional",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "seed": "node src/config/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.7.0",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.20.0",
+    "xlsx": "^0.18.5"
+  }
+}

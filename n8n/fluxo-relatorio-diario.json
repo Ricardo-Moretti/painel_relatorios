@@ -1,0 +1,66 @@
+{
+  "name": "GLPI - Relatório Diário por Email",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "relatorio-glpi",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "🔗 Webhook Relatório GLPI",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "relatorio-glpi"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json.body || $input.first().json;\nconst r = d.resumo || {};\nconst st = d.porStatus || {};\n\nconst slaCor = (r.slaPct||0) >= 80 ? '#059669' : (r.slaPct||0) >= 60 ? '#d97706' : '#dc2626';\nconst slaBg = (r.slaPct||0) >= 80 ? '#ecfdf5' : (r.slaPct||0) >= 60 ? '#fffbeb' : '#fef2f2';\nconst slaAtenCor = (r.slaAtenPct||0) >= 80 ? '#059669' : (r.slaAtenPct||0) >= 60 ? '#d97706' : '#dc2626';\n\n// Variação vs ontem\nconst varAbertos = (r.abertosHoje||0) - (r.abertosOntem||0);\nconst varSoluc = (r.solucionadosHoje||0) - (r.solucionadosOntem||0);\nconst seta = (v) => v > 0 ? '▲ +' + v : v < 0 ? '▼ ' + v : '= 0';\nconst setCor = (v, inv) => { if (inv) return v > 0 ? '#dc2626' : v < 0 ? '#059669' : '#64748b'; return v > 0 ? '#059669' : v < 0 ? '#dc2626' : '#64748b'; };\n\nlet cats = '';\n(d.categoriasHoje || []).forEach((c, i) => {\n  cats += '<tr><td style=\"padding:12px 24px;font-size:14px;color:#334155;background:'+(i%2===0?'#ffffff':'#f8fafc')+';border-bottom:1px solid #e2e8f0\">'+c.categoria+'</td><td style=\"padding:12px 24px;font-size:16px;font-weight:700;text-align:right;color:#1e293b;background:'+(i%2===0?'#ffffff':'#f8fafc')+';border-bottom:1px solid #e2e8f0\">'+c.qtd+'</td></tr>';\n});\n\nlet atds = '';\nconst medalhas = ['🥇','🥈','🥉'];\n(d.atendentesHoje || []).forEach((a, i) => {\n  const m = medalhas[i] || (i+1)+'.';\n  atds += '<tr><td style=\"padding:12px 24px;font-size:14px;color:#334155;background:'+(i%2===0?'#ffffff':'#f8fafc')+';border-bottom:1px solid #e2e8f0\">'+m+' '+a.nome+'</td><td style=\"padding:12px 24px;font-size:16px;font-weight:700;text-align:right;color:#059669;background:'+(i%2===0?'#ffffff':'#f8fafc')+';border-bottom:1px solid #e2e8f0\">'+a.resolvidos+'</td></tr>';\n});\n\nconst kpi = (label, valor, cor, bg) => '<td width=\"25%\" style=\"padding:4px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"background-color:'+bg+';padding:24px 16px;text-align:center;border:1px solid #e2e8f0\"><p style=\"font-size:42px;font-weight:800;color:'+cor+';margin:0;line-height:1;font-family:Segoe UI,Arial,sans-serif\">'+valor+'</p><p style=\"font-size:11px;color:#64748b;margin:8px 0 0;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;font-family:Segoe UI,Arial,sans-serif\">'+label+'</p></td></tr></table></td>';\n\nconst metrica = (emoji, label, valor, cor) => '<tr><td style=\"padding:16px 24px;font-size:14px;color:#475569;border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">'+emoji+' '+label+'</td><td style=\"padding:16px 24px;font-size:18px;font-weight:800;text-align:right;color:'+cor+';border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">'+valor+'</td></tr>';\n\nconst html = '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"></head>'\n+'<body style=\"margin:0;padding:0;background-color:#e2e8f0;font-family:Segoe UI,Helvetica,Arial,sans-serif\">'\n+'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#e2e8f0;padding:32px 0\"><tr><td align=\"center\">'\n+'<table width=\"660\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:660px;width:100%\">'\n\n// HEADER\n+'<tr><td style=\"background-color:#0f172a;padding:36px 44px\">'\n+'<table width=\"100%\"><tr><td>'\n+'<h1 style=\"color:#ffffff;margin:0;font-size:24px;font-weight:800;font-family:Segoe UI,Arial,sans-serif\">📊 Relatorio Diario — GLPI TI</h1>'\n+'<p style=\"color:#94a3b8;margin:10px 0 0;font-size:14px;font-family:Segoe UI,Arial,sans-serif\">'+(d.dataFormatada||'Hoje')+' | Grupo GLPI_TI | Tracbel Agro</p>'\n+'</td><td style=\"text-align:right;vertical-align:top\">'\n+'<p style=\"color:#60a5fa;font-size:11px;font-weight:600;margin:0;font-family:Segoe UI,Arial,sans-serif\">AUTOMATICO</p>'\n+'</td></tr></table>'\n+'</td></tr>'\n\n// KPIs PRINCIPAIS\n+'<tr><td style=\"background-color:#ffffff;padding:32px 40px 24px\">'\n+'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>'\n+kpi('ABERTOS', r.abertos||0, '#dc2626', '#fef2f2')\n+kpi('SOLUCIONADOS', r.solucionadosHoje||0, '#059669', '#ecfdf5')\n+kpi('NOVOS HOJE', r.abertosHoje||0, '#1e40af', '#eff6ff')\n+kpi('SLA SOLUCAO', (r.slaPct||0)+'%', slaCor, slaBg)\n+'</tr></table>'\n\n// COMPARAÇÃO COM ONTEM\n+'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top:16px\"><tr>'\n+'<td style=\"padding:10px 16px;text-align:center;background-color:#f8fafc;border:1px solid #e2e8f0\">'\n+'<span style=\"font-size:12px;color:#64748b;font-family:Segoe UI,Arial,sans-serif\">vs Ontem: </span>'\n+'<span style=\"font-size:13px;font-weight:700;color:'+setCor(varAbertos,true)+';font-family:Segoe UI,Arial,sans-serif\">'+seta(varAbertos)+' novos</span>'\n+'<span style=\"font-size:12px;color:#cbd5e1;margin:0 8px\">|</span>'\n+'<span style=\"font-size:13px;font-weight:700;color:'+setCor(varSoluc,false)+';font-family:Segoe UI,Arial,sans-serif\">'+seta(varSoluc)+' solucionados</span>'\n+'</td></tr></table>'\n+'</td></tr>'\n\n// MÉTRICAS DETALHADAS\n+'<tr><td style=\"background-color:#ffffff;padding:0 40px 28px\">'\n+'<h3 style=\"font-size:14px;font-weight:700;color:#0f172a;margin:0 0 12px;font-family:Segoe UI,Arial,sans-serif\">📈 Metricas do Dia</h3>'\n+'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e2e8f0\">'\n+metrica('🎯', 'SLA Atendimento (1a resposta)', (r.slaAtenPct||0)+'%', slaAtenCor)\n+metrica('⏱️', 'Tempo medio de solucao', (r.tempoMedioHoje||0)+'h', '#1e40af')\n+metrica('⚡', 'Tempo medio 1a resposta', (r.tempoRespostaHoje||0)+'h', '#7c3aed')\n+metrica('🔴', 'Chamados com mais de 45 dias', r.envelhecidos||0, '#dc2626')\n+metrica('🔄', 'Reaberturas hoje', r.reabertosHoje||0, '#d97706')\n+metrica('🔒', 'Fechados hoje', r.fechadosHoje||0, '#334155')\n+metrica('🔐', 'VPN — novos hoje', r.vpnHoje||0, '#1e40af')\n+metrica('🔐', 'VPN — abertos total', r.vpnAbertos||0, '#64748b')\n+metrica('🔑', 'Reset de senha hoje', r.resetSenhaHoje||0, '#d97706')\n+'</table>'\n+'</td></tr>'\n\n// STATUS DOS ABERTOS\n+'<tr><td style=\"background-color:#ffffff;padding:0 40px 28px\">'\n+'<h3 style=\"font-size:14px;font-weight:700;color:#0f172a;margin:0 0 12px;font-family:Segoe UI,Arial,sans-serif\">📋 Status dos Chamados Abertos</h3>'\n+'<table width=\"100%\" cellpadding=\"0\" cellspacing=\"8\"><tr>'\n+'<td width=\"25%\" style=\"text-align:center;padding:16px;background-color:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#334155;margin:0\">'+( st.novos||0)+'</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">⚪ Novos</p></td>'\n+'<td width=\"25%\" style=\"text-align:center;padding:16px;background-color:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#334155;margin:0\">'+(st.atribuidos||0)+'</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">🟢 Atribuidos</p></td>'\n+'<td width=\"25%\" style=\"text-align:center;padding:16px;background-color:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#334155;margin:0\">'+(st.planejados||0)+'</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">🟡 Planejados</p></td>'\n+'<td width=\"25%\" style=\"text-align:center;padding:16px;background-color:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#334155;margin:0\">'+(st.pendentes||0)+'</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">🟠 Pendentes</p></td>'\n+'</tr></table>'\n+'</td></tr>'\n\n// TOP CATEGORIAS\n+(cats ? '<tr><td style=\"background-color:#ffffff;padding:0 40px 28px\"><h3 style=\"font-size:14px;font-weight:700;color:#0f172a;margin:0 0 12px;font-family:Segoe UI,Arial,sans-serif\">📋 Top Categorias do Dia</h3><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e2e8f0\">'+cats+'</table></td></tr>' : '')\n\n// TOP ATENDENTES\n+(atds ? '<tr><td style=\"background-color:#ffffff;padding:0 40px 28px\"><h3 style=\"font-size:14px;font-weight:700;color:#0f172a;margin:0 0 12px;font-family:Segoe UI,Arial,sans-serif\">🏆 Top Atendentes do Dia</h3><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e2e8f0\">'+atds+'</table></td></tr>' : '')\n\n// FOOTER\n+'<tr><td style=\"background-color:#f1f5f9;padding:24px 44px;text-align:center;border-top:2px solid #e2e8f0\">'\n+'<p style=\"font-size:12px;color:#64748b;margin:0;font-family:Segoe UI,Arial,sans-serif\"><strong>Painel de Rotinas</strong> — Relatorio automatico | Grupo GLPI_TI | Tracbel Agro</p>'\n+'<p style=\"font-size:11px;color:#94a3b8;margin:6px 0 0;font-family:Segoe UI,Arial,sans-serif\">Este email foi gerado automaticamente. Nao responda.</p>'\n+'</td></tr>'\n\n+'</table></td></tr></table></body></html>';\n\nconst assunto = '📊 Relatorio TI — ' + (r.solucionadosHoje||0) + ' solucionados | ' + (r.abertos||0) + ' abertos | SLA ' + (r.slaPct||0) + '% | ' + (d.dataFormatada||'Hoje');\n\nreturn [{ json: { html, assunto } }];"
+      },
+      "id": "montar-email",
+      "name": "📧 Montar Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply_agro@tracbel.com.br",
+        "toEmail": "ricardo.moretti@tracbel.com.br, hugo.rocha@tracbel.com.br, athaide.matos@tracbel.com.br",
+        "subject": "={{ $json.assunto }}",
+        "emailType": "html",
+        "html": "={{ $json.html }}"
+      },
+      "id": "enviar-email",
+      "name": "📨 Enviar Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"sucesso\": true, \"mensagem\": \"Email enviado\"}"
+      },
+      "id": "responder-webhook",
+      "name": "✅ Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "🔗 Webhook Relatório GLPI": {
+      "main": [[{ "node": "📧 Montar Email HTML", "type": "main", "index": 0 }]]
+    },
+    "📧 Montar Email HTML": {
+      "main": [[{ "node": "📨 Enviar Email", "type": "main", "index": 0 }]]
+    },
+    "📨 Enviar Email": {
+      "main": [[{ "node": "✅ Responder OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}
