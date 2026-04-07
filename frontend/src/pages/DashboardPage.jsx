@@ -576,7 +576,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── ACIMA DO FOLD — sem scroll em 1080p ── */}
+          {/* ── ACIMA DO FOLD — KPIs + Heatmap são o foco na TV ── */}
 
           {/* KPI Cards — linha única super compacta */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '8px' }}>
@@ -586,14 +586,16 @@ export default function DashboardPage() {
             <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
           </div>
 
-          {/* Tabela — linha própria compacta */}
-          <div style={{ marginBottom: '8px' }}>
-            <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
-          </div>
-
-          {/* Heatmap — largura total, destaque máximo na TV */}
+          {/* Heatmap — DESTAQUE TOTAL, logo após os KPIs */}
           <div style={{ marginBottom: '12px' }}>
             <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
+          </div>
+
+          {/* ── ABAIXO DO FOLD — resto com scroll ── */}
+
+          {/* Tabela de rotinas */}
+          <div style={{ marginBottom: '8px' }}>
+            <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
           </div>
 
           {/* ── ABAIXO DO FOLD — scroll para ver ── */}
