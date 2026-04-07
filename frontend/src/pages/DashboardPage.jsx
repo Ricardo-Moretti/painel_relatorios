@@ -250,30 +250,37 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
     return { s, e, p }
   }
 
+  const glowBolinha = (s, q) => {
+    if (s === 'Erro' || q > 60) return '0 0 10px 2px rgba(252,56,29,0.65)'
+    if (s === 'Sucesso' || (q != null && q <= 50)) return '0 0 8px 1px rgba(22,163,74,0.5)'
+    if (s === 'Parcial' || (q != null && q <= 60)) return '0 0 8px 1px rgba(245,158,11,0.5)'
+    return 'none'
+  }
+
   return (
-    <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-glow)', boxShadow: 'var(--shadow-sm), var(--glow-card)', borderRadius: '14px', overflow: 'hidden' }}>
+    <div style={{ backgroundColor: 'var(--bg-card)', border: '2px solid var(--border-glow)', boxShadow: '0 4px 32px rgba(1,126,250,0.08), var(--glow-card)', borderRadius: '16px', overflow: 'hidden' }}>
       {/* Header com resumo */}
-      <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', background: 'linear-gradient(90deg, var(--bg-inset) 0%, var(--bg-card) 100%)' }}>
         <div>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>Status dos Ultimos 10 Dias</h3>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Acompanhamento diario das rotinas + chamados GLPI</p>
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-0.01em' }}>Status dos Ultimos 10 Dias</h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Acompanhamento diario das rotinas + chamados GLPI</p>
         </div>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           {/* KPIs mini do GLPI */}
-          <div style={{ textAlign: 'center', padding: '8px 16px', borderRadius: '10px', backgroundColor: 'var(--bg-inset)', border: '1px solid var(--border-light)' }}>
-            <p style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-heading)' }}>{somaGlpi}</p>
-            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>Chamados total</p>
+          <div style={{ textAlign: 'center', padding: '8px 20px', borderRadius: '10px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <p style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-heading)', lineHeight: 1 }}>{somaGlpi}</p>
+            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>Chamados total</p>
           </div>
-          <div style={{ textAlign: 'center', padding: '8px 16px', borderRadius: '10px', backgroundColor: 'var(--bg-inset)', border: '1px solid var(--border-light)' }}>
-            <p style={{ fontSize: '18px', fontWeight: 800, color: mediaGlpi > 50 ? '#fc381d' : mediaGlpi > 30 ? '#f59e0b' : '#30d987' }}>{mediaGlpi}</p>
-            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>Media/dia</p>
+          <div style={{ textAlign: 'center', padding: '8px 20px', borderRadius: '10px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+            <p style={{ fontSize: '22px', fontWeight: 800, color: mediaGlpi > 50 ? '#fc381d' : mediaGlpi > 30 ? '#f59e0b' : '#30d987', lineHeight: 1 }}>{mediaGlpi}</p>
+            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>Media/dia</p>
           </div>
           {/* Legenda */}
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {[{ l: 'Sucesso', c: '#16a34a' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#f59e0b' }, { l: 'Sem dados', c: '#e2e8f0' }].map(({ l, c }) => (
-              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: c }} />
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l}</span>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            {[{ l: 'Sucesso', c: '#16a34a' }, { l: 'Erro', c: '#fc381d' }, { l: 'Parcial', c: '#f59e0b' }, { l: 'Sem dados', c: '#cbd5e1' }].map(({ l, c }) => (
+              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: c, boxShadow: `0 0 6px ${c}88` }} />
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{l}</span>
               </div>
             ))}
           </div>
@@ -284,13 +291,13 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ backgroundColor: 'var(--bg-inset)' }}>
-            <th style={{ textAlign: 'left', padding: '8px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', width: '140px' }}>Rotina</th>
+            <th style={{ textAlign: 'left', padding: '10px 20px', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', width: '160px' }}>Rotina</th>
             {diasArray.map(d => (
-              <th key={d} style={{ textAlign: 'center', padding: '12px 4px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
+              <th key={d} style={{ textAlign: 'center', padding: '10px 6px', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)' }}>
                 {d && d.length >= 10 ? d.substring(8,10)+'/'+d.substring(5,7) : d}
               </th>
             ))}
-            <th style={{ textAlign: 'center', padding: '12px 12px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Resumo</th>
+            <th style={{ textAlign: 'center', padding: '10px 16px', fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Resumo</th>
           </tr>
         </thead>
         <tbody>
@@ -300,35 +307,34 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
               <tr key={rot} style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: i % 2 === 1 ? 'var(--bg-inset)' : 'transparent', transition: 'background 100ms' }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = i % 2 === 1 ? 'var(--bg-inset)' : 'transparent'}>
-                <td style={{ padding: '8px 16px', fontSize: '14px', fontWeight: 600, color: 'var(--text-heading)' }}>{rot}</td>
+                <td style={{ padding: '10px 20px', fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>{rot}</td>
                 {diasArray.map(d => {
-                  // GLPI: cor baseada no número de chamados. Outras: cor baseada no status texto.
-                  const corBolinha = isGlpi(rot) ? corGlpiBolinha(glpiMap[d]) : corC(porRotina[rot]?.[d])
+                  const status = porRotina[rot]?.[d]
+                  const corBolinha = isGlpi(rot) ? corGlpiBolinha(glpiMap[d]) : corC(status)
                   const dFmt = d && d.length >= 10 ? d.substring(8,10)+'/'+d.substring(5,7)+'/'+d.substring(0,4) : d
                   const tooltipText = isGlpi(rot)
                     ? `GLPI — ${dFmt} — ${glpiMap[d] != null ? glpiMap[d] + ' chamados' : 'Sem dados'}`
-                    : `${rot} — ${dFmt} — ${porRotina[rot]?.[d] || 'Sem dados'}`
-                  const temErro = isGlpi(rot) ? (glpiMap[d] > 60) : (porRotina[rot]?.[d] === 'Erro')
+                    : `${rot} — ${dFmt} — ${status || 'Sem dados'}`
                   return (
-                    <td key={d} style={{ textAlign: 'center', padding: '12px 4px' }}>
+                    <td key={d} style={{ textAlign: 'center', padding: '10px 6px' }}>
                       <span title={tooltipText}
                         style={{
-                          display: 'inline-block', width: '18px', height: '18px', borderRadius: '50%',
+                          display: 'inline-block', width: '26px', height: '26px', borderRadius: '50%',
                           backgroundColor: corBolinha,
-                          boxShadow: temErro ? '0 0 6px rgba(252,56,29,0.4)' : 'none',
-                          transition: 'transform 150ms', cursor: 'pointer',
+                          boxShadow: glowBolinha(status, isGlpi(rot) ? glpiMap[d] : null),
+                          transition: 'transform 150ms, box-shadow 150ms', cursor: 'pointer',
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.4)'}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'} />
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.4)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }} />
                     </td>
                   )
                 })}
                 {/* Resumo mini */}
-                <td style={{ padding: '12px 12px', textAlign: 'center' }}>
+                <td style={{ padding: '10px 16px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
-                    {c.s > 0 && <span style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a' }}>{c.s}S</span>}
-                    {c.e > 0 && <span style={{ fontSize: '12px', fontWeight: 700, color: '#fc381d' }}>{c.e}E</span>}
-                    {c.p > 0 && <span style={{ fontSize: '12px', fontWeight: 700, color: '#f59e0b' }}>{c.p}P</span>}
+                    {c.s > 0 && <span style={{ fontSize: '13px', fontWeight: 800, color: '#16a34a' }}>{c.s}S</span>}
+                    {c.e > 0 && <span style={{ fontSize: '13px', fontWeight: 800, color: '#fc381d' }}>{c.e}E</span>}
+                    {c.p > 0 && <span style={{ fontSize: '13px', fontWeight: 800, color: '#f59e0b' }}>{c.p}P</span>}
                   </div>
                 </td>
               </tr>
@@ -336,27 +342,26 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
           })}
 
           {/* Linha GLPI */}
-          <tr style={{ borderTop: '3px solid var(--border)' }}>
-            <td style={{ padding: '10px 16px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-heading)' }}>GLPI</span>
+          <tr style={{ borderTop: '2px solid var(--border)' }}>
+            <td style={{ padding: '12px 20px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-heading)' }}>GLPI</span>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>chamados</span>
             </td>
             {diasArray.map(d => { const q = glpiMap[d]; return (
-              <td key={d} style={{ textAlign: 'center', padding: '12px 4px' }}>
+              <td key={d} style={{ textAlign: 'center', padding: '12px 6px' }}>
                 {q != null ? (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    minWidth: '40px', padding: '5px 10px', borderRadius: '10px',
-                    fontSize: '14px', fontWeight: 800,
+                    minWidth: '44px', padding: '6px 10px', borderRadius: '10px',
+                    fontSize: '16px', fontWeight: 800,
                     backgroundColor: corBg(q), border: `1.5px solid ${corBd(q)}`, color: corB(q),
-                    boxShadow: q > 50 ? '0 0 8px rgba(252,56,29,0.2)' : 'none',
+                    boxShadow: q > 60 ? '0 0 10px 2px rgba(252,56,29,0.4)' : q > 50 ? '0 0 8px rgba(245,158,11,0.3)' : '0 0 8px rgba(22,163,74,0.25)',
                   }}>{q}</span>
-                ) : <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>-</span>}
+                ) : <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>-</span>}
               </td>
             )})}
-            {/* Resumo GLPI */}
-            <td style={{ padding: '12px 12px', textAlign: 'center' }}>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-heading)' }}>{somaGlpi}</span>
+            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+              <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-heading)' }}>{somaGlpi}</span>
             </td>
           </tr>
         </tbody>
@@ -581,9 +586,13 @@ export default function DashboardPage() {
             <KpiCard label="Erros" valor={cards?.totalErro || 0} cor="var(--red)" variacao={v.erro} />
           </div>
 
-          {/* Tabela + Heatmap 50/50 — foco visual principal */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+          {/* Tabela — linha própria compacta */}
+          <div style={{ marginBottom: '8px' }}>
             <TabelaRotinas dados={tabelaAnalitica} onClickRotina={(r) => setModalRotina(r)} />
+          </div>
+
+          {/* Heatmap — largura total, destaque máximo na TV */}
+          <div style={{ marginBottom: '12px' }}>
             <GlpiHeatmap heatmap={heatmap10} glpi={glpi10dias} todasRotinas={(tabelaAnalitica || []).map(r => r.nome)} />
           </div>
 
