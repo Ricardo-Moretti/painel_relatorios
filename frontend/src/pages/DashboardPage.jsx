@@ -222,8 +222,9 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
   // Incluir todas as rotinas, mesmo sem dados
   todasRotinas.forEach(r => { if (!porRotina[r]) porRotina[r] = {} })
   const rotinas = Object.keys(porRotina).sort()
-  const glpiMap = {}; glpi.forEach(g => { glpiMap[g.data] = g.quantidade })
+  const glpiMap = {}; glpi.forEach(g => { glpiMap[g.data] = { quantidade: g.quantidade, envelhecidos: g.envelhecidos || 0 } })
   const somaGlpi = glpi.reduce((a, d) => a + d.quantidade, 0)
+  const somaEnvelhecidos = glpi.reduce((a, d) => a + (d.envelhecidos || 0), 0)
   const mediaGlpi = glpi.length ? Math.round(somaGlpi / glpi.length) : 0
 
   // Cor da bolinha: para GLPI usa o número, para outras usa o status texto
@@ -234,13 +235,15 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
   const corBd = (q) => q == null ? null : q <= 50 ? 'rgba(22,163,74,0.3)' : q <= 60 ? 'rgba(245,158,11,0.3)' : 'rgba(252,56,29,0.3)'
 
   const isGlpi = (rot) => rot.toUpperCase() === 'GLPI'
+  const glpiQtd = (d) => glpiMap[d]?.quantidade ?? null
+  const glpiEnv = (d) => glpiMap[d]?.envelhecidos ?? 0
 
   // Contagem por rotina — GLPI conta baseado no número
   const contagemRotina = (rot) => {
     let s = 0, e = 0, p = 0
     diasArray.forEach(d => {
       if (isGlpi(rot)) {
-        const q = glpiMap[d]
+        const q = glpiQtd(d)
         if (q != null) { if (q <= 50) s++; else if (q <= 60) p++; else e++ }
       } else {
         const st = porRotina[rot]?.[d]
@@ -268,12 +271,12 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
           {/* KPIs mini do GLPI */}
           <div style={{ textAlign: 'center', padding: '8px 20px', borderRadius: '10px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <p style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-heading)', lineHeight: 1 }}>{somaGlpi}</p>
-            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>Chamados total</p>
+            <p style={{ fontSize: '22px', fontWeight: 800, color: mediaGlpi > 60 ? '#fc381d' : mediaGlpi > 50 ? '#f59e0b' : '#30d987', lineHeight: 1 }}>{mediaGlpi}</p>
+            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>Media abertos/dia</p>
           </div>
           <div style={{ textAlign: 'center', padding: '8px 20px', borderRadius: '10px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-            <p style={{ fontSize: '22px', fontWeight: 800, color: mediaGlpi > 50 ? '#fc381d' : mediaGlpi > 30 ? '#f59e0b' : '#30d987', lineHeight: 1 }}>{mediaGlpi}</p>
-            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>Media/dia</p>
+            <p style={{ fontSize: '22px', fontWeight: 800, color: somaEnvelhecidos > 0 ? '#fc381d' : '#30d987', lineHeight: 1 }}>{somaEnvelhecidos}</p>
+            <p style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', marginTop: '2px' }}>Envelhecidos (+45d)</p>
           </div>
           {/* Legenda */}
           <div style={{ display: 'flex', gap: '16px' }}>
@@ -310,10 +313,11 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
                 <td style={{ padding: '10px 20px', fontSize: '15px', fontWeight: 700, color: 'var(--text-heading)' }}>{rot}</td>
                 {diasArray.map(d => {
                   const status = porRotina[rot]?.[d]
-                  const corBolinha = isGlpi(rot) ? corGlpiBolinha(glpiMap[d]) : corC(status)
+                  const q = glpiQtd(d)
+                  const corBolinha = isGlpi(rot) ? corGlpiBolinha(q) : corC(status)
                   const dFmt = d && d.length >= 10 ? d.substring(8,10)+'/'+d.substring(5,7)+'/'+d.substring(0,4) : d
                   const tooltipText = isGlpi(rot)
-                    ? `GLPI — ${dFmt} — ${glpiMap[d] != null ? glpiMap[d] + ' chamados' : 'Sem dados'}`
+                    ? `GLPI — ${dFmt} — ${q != null ? q + ' abertos, ' + glpiEnv(d) + ' envelhecidos' : 'Sem dados'}`
                     : `${rot} — ${dFmt} — ${status || 'Sem dados'}`
                   return (
                     <td key={d} style={{ textAlign: 'center', padding: '10px 6px' }}>
@@ -345,23 +349,35 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
           <tr style={{ borderTop: '2px solid var(--border)' }}>
             <td style={{ padding: '12px 20px' }}>
               <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-heading)' }}>GLPI</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>chamados</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '8px' }}>abertos (envelhecidos)</span>
             </td>
-            {diasArray.map(d => { const q = glpiMap[d]; return (
-              <td key={d} style={{ textAlign: 'center', padding: '12px 6px' }}>
-                {q != null ? (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    minWidth: '44px', padding: '6px 10px', borderRadius: '10px',
-                    fontSize: '16px', fontWeight: 800,
-                    backgroundColor: corBg(q), border: `1.5px solid ${corBd(q)}`, color: corB(q),
-                    boxShadow: q > 60 ? '0 0 10px 2px rgba(252,56,29,0.4)' : q > 50 ? '0 0 8px rgba(245,158,11,0.3)' : '0 0 8px rgba(22,163,74,0.25)',
-                  }}>{q}</span>
-                ) : <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>-</span>}
-              </td>
-            )})}
+            {diasArray.map(d => {
+              const q = glpiQtd(d)
+              const env = glpiEnv(d)
+              return (
+                <td key={d} style={{ textAlign: 'center', padding: '8px 6px' }}>
+                  {q != null ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        minWidth: '44px', padding: '4px 8px', borderRadius: '8px',
+                        fontSize: '15px', fontWeight: 800,
+                        backgroundColor: corBg(q), border: `1.5px solid ${corBd(q)}`, color: corB(q),
+                        boxShadow: q > 60 ? '0 0 10px 2px rgba(252,56,29,0.4)' : q > 50 ? '0 0 8px rgba(245,158,11,0.3)' : '0 0 8px rgba(22,163,74,0.25)',
+                      }}>{q}</span>
+                      {env > 0 && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#fc381d' }}>+{env}d</span>
+                      )}
+                    </div>
+                  ) : <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>-</span>}
+                </td>
+              )
+            })}
             <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-              <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-heading)' }}>{somaGlpi}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-heading)' }}>{mediaGlpi}</span>
+                {somaEnvelhecidos > 0 && <span style={{ fontSize: '11px', fontWeight: 700, color: '#fc381d' }}>+{somaEnvelhecidos}d</span>}
+              </div>
             </td>
           </tr>
         </tbody>

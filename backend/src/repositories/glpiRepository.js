@@ -5,18 +5,25 @@
 const { pool } = require('../config/database');
 
 const glpiRepository = {
-  /** Insere ou atualiza indicador do dia */
-  async upsert({ data, quantidade }) {
+  /** Insere ou atualiza indicador do dia — adiciona coluna envelhecidos se necessária */
+  async upsert({ data, quantidade, envelhecidos = 0 }) {
+    // Garante que a coluna existe (migração automática)
     await pool.execute(
-      'INSERT INTO indicadores_glpi (data, quantidade) VALUES (?, ?) ON DUPLICATE KEY UPDATE quantidade = ?',
-      [data, quantidade, quantidade]
+      `ALTER TABLE indicadores_glpi ADD COLUMN IF NOT EXISTS envelhecidos INT NOT NULL DEFAULT 0`
+    ).catch(() => {}); // ignora se já existe ou banco não suporta IF NOT EXISTS
+
+    await pool.execute(
+      'INSERT INTO indicadores_glpi (data, quantidade, envelhecidos) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quantidade = ?, envelhecidos = ?',
+      [data, quantidade, envelhecidos, quantidade, envelhecidos]
     );
   },
 
   /** Busca indicadores por período */
   async buscarPorPeriodo(dataInicio, dataFim) {
     const [rows] = await pool.execute(
-      'SELECT DATE_FORMAT(data, \'%Y-%m-%d\') as data, quantidade FROM indicadores_glpi WHERE data >= ? AND data <= ? ORDER BY data ASC',
+      `SELECT DATE_FORMAT(data, '%Y-%m-%d') as data, quantidade,
+        COALESCE(envelhecidos, 0) as envelhecidos
+       FROM indicadores_glpi WHERE data >= ? AND data <= ? ORDER BY data ASC`,
       [dataInicio, dataFim]
     );
     return rows;

@@ -120,8 +120,8 @@ const glpiIntegracaoService = {
     // Data de hoje
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Salvar indicador GLPI localmente
-    await glpiRepository.upsert({ data: hoje, quantidade: totalAbertos });
+    // Salvar indicador GLPI localmente (abertos + envelhecidos)
+    await glpiRepository.upsert({ data: hoje, quantidade: totalAbertos, envelhecidos });
 
     // Salvar execução da rotina GLPI localmente
     const rotina = await rotinaRepository.criarOuBuscar('GLPI');

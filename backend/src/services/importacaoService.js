@@ -37,30 +37,9 @@ const importacaoService = {
         continue;
       }
 
-      // GLPI especial: status é número = quantidade de chamados
-      if (nomeRotina.toUpperCase() === 'GLPI' && typeof statusRaw === 'number') {
-        try {
-          await pool.execute(
-            'REPLACE INTO indicadores_glpi (data, quantidade) VALUES (?, ?)',
-            [dataExecucao, statusRaw]
-          );
-
-          // Também inserir como execução para aparecer na tabela
-          const rotina = await rotinaRepository.criarOuBuscar(nomeRotina);
-          // Status do GLPI: baseado na quantidade
-          const statusGlpi = statusRaw <= 30 ? 'Sucesso' : statusRaw <= 50 ? 'Parcial' : 'Erro';
-          await rotinaRepository.inserirExecucao({
-            rotina_id: rotina.id,
-            data_execucao: dataExecucao,
-            status: statusGlpi,
-            detalhes: detalhes || `${statusRaw} chamados`,
-            origem_arquivo: nomeArquivo
-          });
-
-          inseridos++;
-        } catch (e) {
-          ignorados++;
-        }
+      // GLPI é gerenciado automaticamente pela integração MySQL — ignorar do Excel
+      if (nomeRotina.toUpperCase() === 'GLPI') {
+        ignorados++;
         continue;
       }
 
