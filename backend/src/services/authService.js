@@ -10,7 +10,7 @@ const { getSecureEnv } = require('../config/crypto');
 require('dotenv').config();
 
 const SECRET = getSecureEnv('JWT_SECRET');
-const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const EXPIRES_IN = process.env.JWT_EXPIRES_IN || '365d';
 
 const authService = {
   /** Realiza login e retorna token JWT */
