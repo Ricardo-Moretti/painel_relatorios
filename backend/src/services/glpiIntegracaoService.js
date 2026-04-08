@@ -190,11 +190,11 @@ const glpiIntegracaoService = {
       FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`, [dias]);
     const slaPct = slaData[0].total > 0 ? +(((slaData[0].total - parseInt(slaData[0].fora_sla || 0)) / slaData[0].total) * 100).toFixed(1) : 0;
 
-    // Top atendentes (solucionados no período)
-    const [atendentes] = await p.execute(`SELECT u.realname, u.firstname, COUNT(*) as resolvidos
+    // Top atendentes — quem adicionou a solução (solver real, COUNT DISTINCT para evitar duplicatas)
+    const [atendentes] = await p.execute(`SELECT u.realname, u.firstname, COUNT(DISTINCT t.id) as resolvidos
       FROM glpi_tickets t ${GF}
-      JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2
-      JOIN glpi_users u ON u.id = tu.users_id
+      JOIN glpi_itilsolutions sol ON sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4
+      JOIN glpi_users u ON u.id = sol.users_id
       WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
       GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias]);
 
@@ -636,11 +636,13 @@ const glpiIntegracaoService = {
       WHERE DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}
       GROUP BY c.id ORDER BY qtd DESC LIMIT 5`);
 
+    // Quem adicionou a solução hoje (solver real, não apenas atribuído)
     const [atendentesHoje] = await p.execute(`SELECT
-      CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome, COUNT(*) as resolvidos
+      CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
+      COUNT(DISTINCT t.id) as resolvidos
       FROM glpi_tickets t ${GF}
-      JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2
-      JOIN glpi_users u ON u.id = tu.users_id
+      JOIN glpi_itilsolutions sol ON sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4
+      JOIN glpi_users u ON u.id = sol.users_id
       WHERE t.solvedate IS NOT NULL AND DATE(t.solvedate) = CURDATE() AND t.is_deleted = 0 ${EF}
       GROUP BY u.id ORDER BY resolvidos DESC LIMIT 5`);
 
