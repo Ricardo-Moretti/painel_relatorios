@@ -610,8 +610,8 @@ const glpiIntegracaoService = {
     const [abertos] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`);
     const [envelhecidos] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF} AND t.date < DATE_SUB(NOW(), INTERVAL 45 DAY)`);
     const [abertosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}`);
-    // Solucionados OU fechados hoje (tickets que saíram da fila no dia)
-    const [solucionadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (DATE(t.solvedate) = CURDATE() OR (t.status = 6 AND DATE(t.closedate) = CURDATE()))`);
+    // Solucionados hoje = solvedate hoje (não mistura com closedate de dias anteriores)
+    const [solucionadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND DATE(t.solvedate) = CURDATE()`);
     const [fechadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status = 6 AND DATE(t.closedate) = CURDATE() AND t.is_deleted = 0 ${EF}`);
 
     const [porStatus] = await p.execute(`SELECT
@@ -637,7 +637,7 @@ const glpiIntegracaoService = {
       WHERE DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}
       GROUP BY c.id ORDER BY qtd DESC LIMIT 5`);
 
-    // Top atendentes — solucionados OU fechados hoje (solver via itilsolutions)
+    // Top atendentes — quem solucionou hoje (solvedate hoje, via itilsolutions)
     const [atendentesHoje] = await p.execute(`SELECT
       CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
       COUNT(DISTINCT t.id) as resolvidos
@@ -645,7 +645,7 @@ const glpiIntegracaoService = {
       JOIN glpi_itilsolutions sol ON sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4
       JOIN glpi_users u ON u.id = sol.users_id
       WHERE t.is_deleted = 0 ${EF}
-        AND (DATE(t.solvedate) = CURDATE() OR (t.status = 6 AND DATE(t.closedate) = CURDATE()))
+        AND DATE(t.solvedate) = CURDATE()
       GROUP BY u.id ORDER BY resolvidos DESC LIMIT 5`);
 
     const [reabertosHoje] = await p.execute(`SELECT COUNT(DISTINCT t.id) as total
@@ -662,7 +662,7 @@ const glpiIntegracaoService = {
 
     // Comparação com ontem
     const [abertosOntem] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE DATE(t.date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND t.is_deleted = 0 ${EF}`);
-    const [solucionadosOntem] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (DATE(t.solvedate) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) OR (t.status = 6 AND DATE(t.closedate) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)))`);
+    const [solucionadosOntem] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND DATE(t.solvedate) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`);
 
     // Tempo resposta hoje
     const [tempoRespostaHoje] = await p.execute(`SELECT ROUND(AVG(t.takeintoaccount_delay_stat/3600),1) as media FROM glpi_tickets t ${GF} WHERE t.takeintoaccount_delay_stat > 0 AND DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}`);
