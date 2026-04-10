@@ -224,7 +224,8 @@ function GlpiHeatmap({ heatmap = [], glpi = [], todasRotinas = [] }) {
   const rotinas = Object.keys(porRotina).sort()
   const glpiMap = {}; glpi.forEach(g => { glpiMap[g.data] = { quantidade: g.quantidade, envelhecidos: g.envelhecidos || 0 } })
   const somaGlpi = glpi.reduce((a, d) => a + d.quantidade, 0)
-  const somaEnvelhecidos = glpi.reduce((a, d) => a + (d.envelhecidos || 0), 0)
+  const ultimoGlpi = glpi.length ? glpi[glpi.length - 1] : null
+  const somaEnvelhecidos = ultimoGlpi?.envelhecidos || 0
   const mediaGlpi = glpi.length ? Math.round(somaGlpi / glpi.length) : 0
 
   // Cor da bolinha: para GLPI usa o número, para outras usa o status texto

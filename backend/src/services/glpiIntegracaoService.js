@@ -167,20 +167,20 @@ const glpiIntegracaoService = {
       SUM(CASE WHEN t.status=4 THEN 1 ELSE 0 END) as pendentes
       FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`);
 
-    // Solucionados hoje
-    const [solucionadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND DATE(t.solvedate) = CURDATE() AND t.is_deleted = 0 ${EF}`);
+    // Solucionados OU fechados hoje
+    const [solucionadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (DATE(t.solvedate) = CURDATE() OR (t.status = 6 AND DATE(t.closedate) = CURDATE()))`);
 
     // Fechados hoje
     const [fechadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status = 6 AND DATE(t.closedate) = CURDATE() AND t.is_deleted = 0 ${EF}`);
 
-    // Solucionados no período
-    const [solucionadosPeriodo] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
+    // Solucionados OU fechados no período
+    const [solucionadosPeriodo] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) OR (t.status = 6 AND t.closedate >= DATE_SUB(NOW(), INTERVAL ? DAY)))`, [dias, dias]);
 
-    // Tempo médio de solução (horas)
-    const [tempoMedio] = await p.execute(`SELECT ROUND(AVG(t.solve_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
+    // Tempo médio de solução (horas) — filtrado por solvedate
+    const [tempoMedio] = await p.execute(`SELECT ROUND(AVG(t.solve_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
 
     // Tempo médio de primeira resposta
-    const [tempoResposta] = await p.execute(`SELECT ROUND(AVG(t.takeintoaccount_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.takeintoaccount_delay_stat > 0 AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
+    const [tempoResposta] = await p.execute(`SELECT ROUND(AVG(t.takeintoaccount_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.takeintoaccount_delay_stat > 0 AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
 
     // SLA Solução — regra Qlik (exclui pendente, inclui abertos que passaram do prazo)
     const [slaData] = await p.execute(`SELECT COUNT(*) as total,
@@ -190,13 +190,18 @@ const glpiIntegracaoService = {
       FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`, [dias]);
     const slaPct = slaData[0].total > 0 ? +(((slaData[0].total - parseInt(slaData[0].fora_sla || 0)) / slaData[0].total) * 100).toFixed(1) : 0;
 
-    // Top atendentes — quem adicionou a solução (solver real, COUNT DISTINCT para evitar duplicatas)
-    const [atendentes] = await p.execute(`SELECT u.realname, u.firstname, COUNT(DISTINCT t.id) as resolvidos
+    // Top atendentes — atribuído AO ticket OU registrou a solução (sem dupla contagem)
+    const [atendentes] = await p.execute(`SELECT
+      CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
+      COUNT(DISTINCT t.id) as resolvidos
       FROM glpi_tickets t ${GF}
-      JOIN glpi_itilsolutions sol ON sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4
-      JOIN glpi_users u ON u.id = sol.users_id
-      WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
-      GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias]);
+      JOIN glpi_users u ON (
+        EXISTS (SELECT 1 FROM glpi_tickets_users tu WHERE tu.tickets_id = t.id AND tu.type = 2 AND tu.users_id = u.id)
+        OR EXISTS (SELECT 1 FROM glpi_itilsolutions sol WHERE sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4 AND sol.users_id = u.id)
+      )
+      WHERE t.is_deleted = 0 ${EF}
+        AND (t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) OR (t.status = 6 AND t.closedate >= DATE_SUB(NOW(), INTERVAL ? DAY)))
+      GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias, dias]);
 
     // Top categorias (abertos)
     const [categorias] = await p.execute(`SELECT
@@ -637,15 +642,17 @@ const glpiIntegracaoService = {
       WHERE DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}
       GROUP BY c.id ORDER BY qtd DESC LIMIT 5`);
 
-    // Top atendentes — quem solucionou hoje (solvedate hoje, via itilsolutions)
+    // Top atendentes hoje — atribuído AO ticket OU registrou a solução (sem dupla contagem)
     const [atendentesHoje] = await p.execute(`SELECT
       CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
       COUNT(DISTINCT t.id) as resolvidos
       FROM glpi_tickets t ${GF}
-      JOIN glpi_itilsolutions sol ON sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4
-      JOIN glpi_users u ON u.id = sol.users_id
+      JOIN glpi_users u ON (
+        EXISTS (SELECT 1 FROM glpi_tickets_users tu WHERE tu.tickets_id = t.id AND tu.type = 2 AND tu.users_id = u.id)
+        OR EXISTS (SELECT 1 FROM glpi_itilsolutions sol WHERE sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4 AND sol.users_id = u.id)
+      )
       WHERE t.is_deleted = 0 ${EF}
-        AND DATE(t.solvedate) = CURDATE()
+        AND (DATE(t.solvedate) = CURDATE() OR (t.status = 6 AND DATE(t.closedate) = CURDATE()))
       GROUP BY u.id ORDER BY resolvidos DESC LIMIT 5`);
 
     const [reabertosHoje] = await p.execute(`SELECT COUNT(DISTINCT t.id) as total
