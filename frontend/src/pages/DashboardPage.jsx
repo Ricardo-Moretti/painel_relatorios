@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import Header from '../components/layout/Header'
 import HistoricoDetalhe from '../components/dashboard/HistoricoDetalhe'
 import { dashboardAPI, glpiAPI } from '../services/api'
+import AnomaliasBanner from '../components/ai/AnomaliasBanner'
 import useToastStore from '../stores/toastStore'
 import useCountUp from '../hooks/useCountUp'
 import ExportButton from '../components/ui/ExportButton'
@@ -594,6 +595,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ── ACIMA DO FOLD — KPIs + Heatmap são o foco na TV ── */}
+          <AnomaliasBanner />
 
           {/* KPI Cards — linha única super compacta */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '8px' }}>

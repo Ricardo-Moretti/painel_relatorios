@@ -82,4 +82,12 @@ export const glpiAPI = {
   statusIntegracao: () => api.get('/glpi/status-integracao'),
 }
 
+/** Serviços de IA */
+export const aiAPI = {
+  anomalias: () => api.get('/ai/anomalias'),
+  chat: (pergunta) => api.post('/ai/chat', { pergunta }),
+  resumoChamados: () => api.get('/ai/resumo-chamados'),
+  previsao: () => api.get('/ai/previsao'),
+}
+
 export default api

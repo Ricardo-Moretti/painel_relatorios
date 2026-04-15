@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import ToastContainer from '../ui/Toast'
+import ChatFlutuante from '../ai/ChatFlutuante'
 import useSidebarStore from '../../stores/sidebarStore'
 
 export default function MainLayout() {
@@ -29,6 +30,7 @@ export default function MainLayout() {
         <Outlet />
       </div>
       <ToastContainer />
+      <ChatFlutuante />
     </div>
   )
 }

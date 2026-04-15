@@ -28,6 +28,7 @@ const importacaoRoutes = require('./routes/importacaoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const rotinaRoutes = require('./routes/rotinaRoutes');
 const glpiRoutes = require('./routes/glpiRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -103,6 +104,7 @@ app.use('/api/importacao', importacaoRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/rotinas', rotinaRoutes);
 app.use('/api/glpi', glpiRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Servir frontend em producao
 app.use(express.static(path.join(__dirname, '../../frontend/dist')));

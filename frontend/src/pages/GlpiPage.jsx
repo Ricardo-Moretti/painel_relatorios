@@ -8,6 +8,7 @@ import { Monitor, Clock, CheckCircle2, Users, AlertTriangle, TrendingUp, Calenda
 import Header from '../components/layout/Header'
 import ExportButton from '../components/ui/ExportButton'
 import { glpiAPI } from '../services/api'
+import GlpiAiPanel from '../components/ai/GlpiAiPanel'
 
 const CORES = ['#3794fc', '#fc381d', '#f59e0b', '#30d987', '#a037fc', '#51cbff', '#fd1f9b', '#6342ff']
 
@@ -132,6 +133,9 @@ export default function GlpiPage() {
 
       <main style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--bg-page)' }}>
         <div className="page-content" style={{ maxWidth: '1600px', margin: '0 auto' }}>
+
+          {/* IA Panel — Agrupamento + Previsão */}
+          <GlpiAiPanel />
 
           {/* Toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>

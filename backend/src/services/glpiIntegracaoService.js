@@ -1013,6 +1013,19 @@ const glpiIntegracaoService = {
     return !!(process.env.GLPI_MYSQL_HOST && process.env.GLPI_MYSQL_USER && process.env.GLPI_MYSQL_PASSWORD);
   },
 
+  /** Feature IA 4 — Retorna títulos dos chamados abertos para agrupamento inteligente */
+  async buscarTitulosChamadosAbertos() {
+    const p = this._getPool();
+    const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
+    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const [rows] = await p.execute(
+      `SELECT t.name FROM glpi_tickets t ${GF}
+       WHERE t.status < 5 AND t.is_deleted = 0 ${EF}
+       ORDER BY t.date DESC LIMIT 200`
+    );
+    return rows.map(r => r.name).filter(Boolean);
+  },
+
   /** Testa conexão */
   async testarConexao() {
     const p = this._getPool();

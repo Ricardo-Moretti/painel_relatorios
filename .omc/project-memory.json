@@ -1,0 +1,184 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775483823741,
+  "projectRoot": "c:\\projetos\\Painel-de-rotinas",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "@playwright/test",
+        "version": "1.59.0",
+        "category": "testing"
+      },
+      {
+        "name": "playwright",
+        "version": "1.59.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "npm test",
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {
+      "test": "echo \"Error: no test specified\" && exit 1"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "backend": {
+      "path": "backend",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1775483823649,
+      "keyFiles": [
+        "package-lock.json",
+        "package.json"
+      ]
+    },
+    "frontend": {
+      "path": "frontend",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1775483823650,
+      "keyFiles": [
+        "eslint.config.js",
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "README.md"
+      ]
+    },
+    "n8n": {
+      "path": "n8n",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775483823694,
+      "keyFiles": [
+        "fluxo-dpm.json",
+        "fluxo-relatorio-diario.json"
+      ]
+    },
+    "test-results": {
+      "path": "test-results",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1775483823695,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1775483823695,
+      "keyFiles": [
+        "security.spec.js"
+      ]
+    },
+    "backend\\data": {
+      "path": "backend\\data",
+      "purpose": "Data files",
+      "fileCount": 4,
+      "lastAccessed": 1775483823697,
+      "keyFiles": [
+        "audit.log",
+        "database.sqlite",
+        "database.sqlite-shm"
+      ]
+    },
+    "backend\\node_modules": {
+      "path": "backend\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1775483823697,
+      "keyFiles": []
+    },
+    "backend\\scripts": {
+      "path": "backend\\scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1775483823698,
+      "keyFiles": [
+        "encrypt-env.js",
+        "testar-glpi.js"
+      ]
+    },
+    "backend\\src": {
+      "path": "backend\\src",
+      "purpose": "Source code",
+      "fileCount": 1,
+      "lastAccessed": 1775483823699,
+      "keyFiles": [
+        "server.js"
+      ]
+    },
+    "frontend\\dist": {
+      "path": "frontend\\dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 3,
+      "lastAccessed": 1775483823701,
+      "keyFiles": [
+        "favicon.svg",
+        "icons.svg",
+        "index.html"
+      ]
+    },
+    "frontend\\node_modules": {
+      "path": "frontend\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1775483823702,
+      "keyFiles": []
+    },
+    "frontend\\public": {
+      "path": "frontend\\public",
+      "purpose": "Public files",
+      "fileCount": 2,
+      "lastAccessed": 1775483823703,
+      "keyFiles": [
+        "favicon.svg",
+        "icons.svg"
+      ]
+    },
+    "frontend\\src": {
+      "path": "frontend\\src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1775483823703,
+      "keyFiles": [
+        "App.jsx",
+        "index.css",
+        "main.jsx"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}
