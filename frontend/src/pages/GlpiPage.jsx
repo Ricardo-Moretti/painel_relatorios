@@ -467,7 +467,7 @@ export default function GlpiPage() {
                 </div>
                 <div style={{ height: '240px' }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={(dados?.tempoPorCategoria || []).reverse()} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+                    <BarChart data={[...(dados?.tempoPorCategoria || [])].reverse()} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                       <CartesianGrid horizontal={false} stroke="#e5e9f2" />
                       <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickFormatter={v => `${v}h`} />
                       <YAxis type="category" dataKey="categoria" width={140} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-heading)' }} />
