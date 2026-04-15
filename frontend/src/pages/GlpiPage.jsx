@@ -4,11 +4,12 @@
  */
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ReferenceLine } from 'recharts'
-import { Monitor, Clock, CheckCircle2, Users, AlertTriangle, TrendingUp, Calendar } from 'lucide-react'
+import { Monitor, Clock, CheckCircle2, Users, AlertTriangle, TrendingUp, Calendar, Mail } from 'lucide-react'
 import Header from '../components/layout/Header'
 import ExportButton from '../components/ui/ExportButton'
 import { glpiAPI } from '../services/api'
 import GlpiAiPanel from '../components/ai/GlpiAiPanel'
+import useToastStore from '../stores/toastStore'
 
 const CORES = ['#3794fc', '#fc381d', '#f59e0b', '#30d987', '#a037fc', '#51cbff', '#fd1f9b', '#6342ff']
 
@@ -33,8 +34,23 @@ export default function GlpiPage() {
   const [carregando, setCarregando] = useState(true)
   const [comparacao, setComparacao] = useState(null)
   const [metCat, setMetCat] = useState(null)
+  const [enviandoEmail, setEnviandoEmail] = useState(false)
+  const addToast = useToastStore(s => s.addToast)
 
   useEffect(() => { carregar() }, [dias])
+
+  const enviarEmail = async () => {
+    if (enviandoEmail) return
+    setEnviandoEmail(true)
+    try {
+      await glpiAPI.enviarRelatorio()
+      addToast('Relatório enviado com sucesso!', 'success')
+    } catch (e) {
+      addToast('Erro ao enviar relatório. Verifique o n8n.', 'error')
+    } finally {
+      setEnviandoEmail(false)
+    }
+  }
 
   const carregar = async () => {
     setCarregando(true)
@@ -150,6 +166,15 @@ export default function GlpiPage() {
                 onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}>
                 Atualizar
+              </button>
+              <button
+                onClick={enviarEmail}
+                disabled={enviandoEmail}
+                style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 18px', borderRadius: '12px', fontSize: '13px', fontWeight: 600, backgroundColor: enviandoEmail ? '#5a7a52' : '#367C2B', color: '#fff', border: 'none', cursor: enviandoEmail ? 'not-allowed' : 'pointer', transition: 'all 150ms', opacity: enviandoEmail ? 0.75 : 1 }}
+                onMouseEnter={(e) => { if (!enviandoEmail) e.currentTarget.style.backgroundColor = '#1D5016' }}
+                onMouseLeave={(e) => { if (!enviandoEmail) e.currentTarget.style.backgroundColor = '#367C2B' }}>
+                <Mail style={{ width: '14px', height: '14px' }} />
+                {enviandoEmail ? 'Enviando...' : 'Enviar Relatório'}
               </button>
               <ExportButton />
             </div>

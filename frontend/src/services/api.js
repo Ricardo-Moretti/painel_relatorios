@@ -80,6 +80,7 @@ export const glpiAPI = {
   listarFiltros: () => api.get('/glpi/filtros'),
   compararMeses: () => api.get('/glpi/comparar-meses'),
   statusIntegracao: () => api.get('/glpi/status-integracao'),
+  enviarRelatorio: () => api.post('/glpi/enviar-relatorio', {}, { timeout: 60000 }),
 }
 
 /** Serviços de IA */
