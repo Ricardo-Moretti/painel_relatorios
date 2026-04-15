@@ -1038,7 +1038,8 @@ const glpiIntegracaoService = {
 
     const [
       [abertos], [envelhecidos], [abertosHoje], [solucionadosHoje],
-      [slaHoje], [slaAtenHoje], [porStatus], [tempoHoje], [abertosOntem], [solucionadosOntem]
+      [slaHoje], [slaAtenHoje], [porStatus], [tempoHoje], [abertosOntem], [solucionadosOntem],
+      [listaEnvelhecidos],
     ] = await Promise.all([
       p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`),
       p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF} AND t.date < DATE_SUB(NOW(), INTERVAL 45 DAY)`),
@@ -1050,6 +1051,13 @@ const glpiIntegracaoService = {
       p.execute(`SELECT ROUND(AVG(t.solve_delay_stat/3600),1) as media FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND DATE(t.solvedate) = CURDATE() AND t.is_deleted = 0 ${EF}`),
       p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE DATE(t.date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND t.is_deleted = 0 ${EF}`),
       p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND DATE(t.solvedate) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`),
+      p.execute(`SELECT t.id, t.name as titulo, DATEDIFF(NOW(), t.date) as dias_aberto,
+        CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as solicitante
+        FROM glpi_tickets t ${GF}
+        LEFT JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 1
+        LEFT JOIN glpi_users u ON u.id = tu.users_id
+        WHERE t.status < 5 AND t.is_deleted = 0 ${EF} AND t.date < DATE_SUB(NOW(), INTERVAL 45 DAY)
+        ORDER BY t.date ASC LIMIT 50`),
     ]);
 
     const slaPct = slaHoje[0].total > 0 ? +(((parseInt(slaHoje[0].dentro) || 0) / slaHoje[0].total) * 100).toFixed(1) : 0;
@@ -1084,6 +1092,12 @@ const glpiIntegracaoService = {
         pendentes: n(porStatus[0].pendentes),
       },
       tempoMedioSolucaoHoje: parseFloat(tempoHoje[0].media) || 0,
+      chamadosEnvelhecidos: listaEnvelhecidos.map(r => ({
+        id: n(r.id),
+        titulo: r.titulo,
+        diasAberto: n(r.dias_aberto),
+        solicitante: (r.solicitante || '').trim(),
+      })),
     };
   },
 

@@ -108,18 +108,17 @@ PÁGINAS DO PAINEL:
 7. Histórico — calendário e análise mensal das rotinas
 
 ESTRUTURA DOS DADOS NO SNAPSHOT:
-- snapshot.glpiHoje — dados de HOJE do GLPI (SEMPRE presente): abertos, envelhecidos, abertosHoje, solucionadosHoje, abertosOntem, solucionadosOntem, slaSolucaoHoje (percentual, total, dentroPrazo, foraPrazo, status), slaAtendimentoHoje (percentual, total, foraPrazo, status), porStatus (novos, atribuidos, planejados, pendentes), tempoMedioSolucaoHoje
-- snapshot.paginas.relatorioDiarioHoje — dados do relatório diário (pode ser null se timeout): resumo com todos os KPIs, atendentesHoje, categoriasHoje
-- snapshot.paginas.glpiBI — BI dos últimos 30 dias (pode ser null se timeout): topAtendentes, topCategorias, tendenciaSemanal
-- snapshot.paginas.dashboard — status das rotinas de TI automatizadas
+- snapshot.glpiHoje — dados de HOJE (SEMPRE presente): abertos, envelhecidos, abertosHoje, solucionadosHoje, abertosOntem, solucionadosOntem, slaSolucaoHoje (percentual, total, dentroPrazo, foraPrazo, status), slaAtendimentoHoje (percentual, total, foraPrazo, status), porStatus (novos, atribuidos, planejados, pendentes), tempoMedioSolucaoHoje, chamadosEnvelhecidos (array: id, titulo, diasAberto, solicitante)
+- snapshot.rotinas — status das rotinas automatizadas: ultimaExecucaoCadaRotina, alertas (errosConsecutivos, rotinasSemExecucao)
+- snapshot.glpiUltimos7Dias — histórico dos últimos 7 dias (data, quantidade, envelhecidos)
 
 REGRAS DE RESPOSTA:
-- Responda SEMPRE em português brasileiro, de forma direta e profissional
-- Use snapshot.glpiHoje como fonte primária para dados de hoje — ele é carregado com prioridade
+- Responda SEMPRE em português brasileiro, de forma direta e objetiva (máximo 4 parágrafos curtos)
+- Use snapshot.glpiHoje como fonte primária para dados de hoje
 - Se slaSolucaoHoje.status = "BOM" → ≥80%, "ALERTA" → 60-79%, "CRITICO" → <60%
+- Para listar envelhecidos: use snapshot.glpiHoje.chamadosEnvelhecidos — liste id + título + dias aberto
 - Formate números com separadores (ex: 1.234) e percentuais com uma casa decimal
-- Identifique padrões e dê insights quando relevante
-- NUNCA diga que não tem dados de SLA de hoje — eles estão em snapshot.glpiHoje.slaSolucaoHoje`;
+- NUNCA diga que não tem dados de SLA ou envelhecidos — eles sempre estão no snapshot`;
 
     const prompt = `DADOS ATUAIS DO PAINEL (${snapshot.dataHoje}):
 ${JSON.stringify(snapshot, null, 2)}
@@ -127,12 +126,12 @@ ${JSON.stringify(snapshot, null, 2)}
 PERGUNTA: ${pergunta}`;
 
     const res = await client.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 700,
+      max_tokens: 500,
       temperature: 0.3,
     });
     return res.choices[0].message.content.trim();

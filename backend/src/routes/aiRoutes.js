@@ -74,59 +74,31 @@ router.post('/chat', autenticar, async (req, res, next) => {
     const hoje = new Date().toISOString().split('T')[0];
     const timeout = (ms) => new Promise(r => setTimeout(() => r(null), ms));
 
-    // Dados leves (MySQL local) — rápidos
-    const [ultimasExecucoes, historico30d, errosConsecutivos, semExecucao, glpiHoje, glpiPeriodo] = await Promise.all([
+    // Tudo em paralelo — local (rápido) + GLPI (timeout 10s máximo)
+    const [
+      ultimasExecucoes, historico30d, errosConsecutivos, semExecucao, glpiPeriodo,
+      resumoRapido,
+    ] = await Promise.all([
       rotinaRepository.buscarUltimasExecucoes().catch(() => []),
       rotinaRepository.dadosTemporais(30).catch(() => []),
       rotinaRepository.errosConsecutivos().catch(() => []),
       rotinaRepository.rotinasSemExecucao(3).catch(() => []),
-      glpiRepository.buscarHoje().catch(() => null),
       glpiRepository.buscarPorPeriodo(d7, hoje).catch(() => []),
-    ]);
-
-    // Dados GLPI — resumo rápido (paralelo, ~5s) + dados pesados com timeout
-    const [resumoRapido, glpiBi, relatorioDiario] = await Promise.all([
-      glpiConfigurado ? Promise.race([glpiIntegracaoService.resumoRapidoParaChat(), timeout(20000)]).catch(() => null) : null,
-      glpiConfigurado ? Promise.race([glpiIntegracaoService.obterBI({ dias: 30 }), timeout(20000)]).catch(() => null) : null,
-      glpiConfigurado ? Promise.race([glpiIntegracaoService.relatorioDiario(), timeout(25000)]).catch(() => null) : null,
+      glpiConfigurado
+        ? Promise.race([glpiIntegracaoService.resumoRapidoParaChat(), timeout(10000)]).catch(() => null)
+        : null,
     ]);
 
     const snapshot = {
       produto: 'Painel de Rotinas TI — John Deere Tracbel',
       dataHoje: hoje,
-      // Dados GLPI de hoje — SEMPRE presentes (resumoRapido usa queries paralelas)
       glpiHoje: resumoRapido || null,
-      paginas: {
-        dashboard: {
-          descricao: 'Status atual de todas as rotinas de TI monitoradas',
-          ultimaExecucaoCadaRotina: ultimasExecucoes,
-          historico30dias: historico30d,
-          alertas: {
-            errosConsecutivos,
-            rotinasSemExecucao: semExecucao,
-          },
-        },
-        glpiBI: glpiBi ? {
-          descricao: 'Business Intelligence de chamados GLPI do grupo GLPI_TI',
-          resumo: glpiBi.resumo,
-          topAtendentes: glpiBi.atendentes?.slice(0, 10),
-          topCategorias: glpiBi.categorias?.slice(0, 10),
-          porStatus: glpiBi.porStatus,
-          slaDetalhado: glpiBi.sla,
-          tendenciaSemanal: glpiBi.tendenciaSemanal,
-          topSolicitantes: glpiBi.topSolicitantes?.slice(0, 5),
-          tempoAtendentes: glpiBi.tempoAtendentes?.slice(0, 5),
-        } : null,
-        relatorioDiarioHoje: relatorioDiario ? {
-          resumo: relatorioDiario.resumo,
-          atendentesHoje: relatorioDiario.atendentesHoje,
-          categoriasHoje: relatorioDiario.categoriasHoje,
-        } : null,
-        glpiIndicadores: {
-          hoje: glpiHoje,
-          ultimos7dias: glpiPeriodo,
-        },
+      rotinas: {
+        ultimaExecucaoCadaRotina: ultimasExecucoes,
+        historico30dias: historico30d,
+        alertas: { errosConsecutivos, rotinasSemExecucao: semExecucao },
       },
+      glpiUltimos7Dias: glpiPeriodo,
     };
     const resposta = await aiService.responderChat(pergunta.trim(), snapshot);
     res.json({ sucesso: true, resposta });
