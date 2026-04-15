@@ -18,7 +18,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "http://localhost:3001/api/ai/narrativa",
+        "url": "http://127.0.0.1:3001/api/ai/narrativa",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
