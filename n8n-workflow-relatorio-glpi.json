@@ -1,0 +1,114 @@
+{
+  "name": "Relatorio Diario GLPI com IA",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "relatorio-glpi",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook — Recebe do Backend",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "relatorio-glpi"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3001/api/ai/narrativa",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-AI-Secret",
+              "value": "={{ $env.AI_WEBHOOK_SECRET }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "http-narrativa",
+      "name": "IA — Buscar Narrativa",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-dados",
+      "name": "Merge — Dados + Narrativa",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "ti@tracbel.com.br",
+        "toEmail": "={{ $env.EMAIL_DESTINATARIOS }}",
+        "subject": "=📊 Relatório TI — {{ $now.setLocale('pt').toFormat('dd/MM/yyyy') }}",
+        "emailFormat": "html",
+        "html": "=<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f6fa; margin: 0; padding: 20px; }\n    .container { max-width: 640px; margin: 0 auto; }\n    .header { background: linear-gradient(135deg, #1D5016 0%, #367C2B 100%); border-radius: 14px 14px 0 0; padding: 28px 32px; text-align: center; }\n    .header h1 { color: #FFDE00; font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }\n    .header p { color: rgba(255,255,255,0.7); font-size: 13px; margin: 6px 0 0; }\n    .body { background: #fff; padding: 28px 32px; border-radius: 0 0 14px 14px; border: 1px solid #e2e8f0; border-top: none; }\n    .narrativa { background: #f0f7ee; border-left: 4px solid #367C2B; border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; line-height: 1.7; color: #1a3a14; }\n    .narrativa-label { font-size: 10px; font-weight: 700; color: #367C2B; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }\n    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }\n    .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; text-align: center; }\n    .kpi-valor { font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1; }\n    .kpi-label { font-size: 11px; color: #64748b; margin-top: 4px; font-weight: 500; }\n    .section-title { font-size: 13px; font-weight: 700; color: #0f172a; margin: 20px 0 10px; text-transform: uppercase; letter-spacing: 0.04em; }\n    .atendente-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; background: #f8fafc; }\n    .atendente-nome { font-size: 13px; color: #334155; font-weight: 500; }\n    .atendente-qtd { font-size: 13px; font-weight: 800; color: #367C2B; }\n    .categoria-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-radius: 6px; margin-bottom: 3px; }\n    .categoria-nome { font-size: 12px; color: #475569; }\n    .categoria-qtd { font-size: 12px; font-weight: 700; color: #64748b; }\n    .sla-bar { height: 8px; border-radius: 4px; background: #e2e8f0; margin-top: 8px; overflow: hidden; }\n    .sla-fill { height: 100%; border-radius: 4px; }\n    .footer { text-align: center; padding: 16px; font-size: 11px; color: #94a3b8; }\n    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }\n    .badge-green { background: #f0fdf4; color: #16a34a; }\n    .badge-red { background: #fef2f2; color: #ef4444; }\n    .badge-amber { background: #fffbeb; color: #d97706; }\n  </style>\n</head>\n<body>\n<div class=\"container\">\n  \n  <!-- Header -->\n  <div class=\"header\">\n    <h1>JOHN DEERE — Relatório TI</h1>\n    <p>{{ $now.setLocale('pt').toFormat('cccc, dd \\\"de\\\" MMMM \\\"de\\\" yyyy') }}</p>\n  </div>\n\n  <div class=\"body\">\n\n    <!-- Narrativa IA -->\n    {{ $('IA — Buscar Narrativa').item.json.sucesso ? '<div class=\"narrativa\"><div class=\"narrativa-label\">✨ Análise por Inteligência Artificial</div>' + $('IA — Buscar Narrativa').item.json.narrativa.replace(/\\n/g, '<br>') + '</div>' : '' }}\n\n    <!-- KPIs principais -->\n    <div class=\"kpis\">\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #ef4444;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.abertos ?? 0 }}</div>\n        <div class=\"kpi-label\">Abertos</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #16a34a;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.solucionadosHoje ?? 0 }}</div>\n        <div class=\"kpi-label\">Solucionados Hoje</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: {{ ($('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0) >= 80 ? '#16a34a' : '#ef4444' }};\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0 }}%</div>\n        <div class=\"kpi-label\">SLA</div>\n      </div>\n    </div>\n\n    <div class=\"kpis\">\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #f59e0b;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.envelhecidos ?? 0 }}</div>\n        <div class=\"kpi-label\">+45 dias (envelhec.)</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #3b82f6;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.tempoMedioSolucao ?? 0 }}h</div>\n        <div class=\"kpi-label\">Tempo Médio Solução</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #8b5cf6;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.solucionadosPeriodo ?? 0 }}</div>\n        <div class=\"kpi-label\">Solucionados 30d</div>\n      </div>\n    </div>\n\n    <!-- SLA bar -->\n    <div class=\"section-title\">SLA do Período</div>\n    <div class=\"sla-bar\">\n      <div class=\"sla-fill\" style=\"width: {{ $('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0 }}%; background: {{ ($('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0) >= 80 ? '#16a34a' : ($('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0) >= 60 ? '#f59e0b' : '#ef4444' }};\"></div>\n    </div>\n    <p style=\"font-size: 12px; color: #64748b; margin: 4px 0 0; text-align: right;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0 }}% dentro do prazo</p>\n\n    <!-- Top Atendentes -->\n    {{ $('Webhook — Recebe do Backend').item.json.atendentesHoje?.length ? '<div class=\"section-title\">🏆 Top Atendentes Hoje</div>' : '' }}\n    {{ $('Webhook — Recebe do Backend').item.json.atendentesHoje?.map((a, i) => `<div class=\"atendente-row\"><span class=\"atendente-nome\">${i + 1}. ${a.nome}</span><span class=\"atendente-qtd\">${a.resolvidos} ✓</span></div>`).join('') ?? '' }}\n\n    <!-- Top Categorias -->\n    {{ $('Webhook — Recebe do Backend').item.json.categoriasHoje?.length ? '<div class=\"section-title\" style=\"margin-top: 20px;\">📂 Categorias com Mais Chamados Hoje</div>' : '' }}\n    {{ $('Webhook — Recebe do Backend').item.json.categoriasHoje?.map(c => `<div class=\"categoria-row\"><span class=\"categoria-nome\">${c.categoria}</span><span class=\"categoria-qtd\">${c.qtd}</span></div>`).join('') ?? '' }}\n\n  </div>\n\n  <!-- Footer -->\n  <div class=\"footer\">\n    Gerado automaticamente pelo Painel de Rotinas TI · John Deere<br>\n    {{ $now.setLocale('pt').toFormat('dd/MM/yyyy HH:mm') }}\n  </div>\n\n</div>\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Enviar Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\" }",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 460]
+    }
+  ],
+  "connections": {
+    "Webhook — Recebe do Backend": {
+      "main": [
+        [
+          { "node": "IA — Buscar Narrativa", "type": "main", "index": 0 },
+          { "node": "Merge — Dados + Narrativa", "type": "main", "index": 1 },
+          { "node": "Responder Webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "IA — Buscar Narrativa": {
+      "main": [
+        [
+          { "node": "Merge — Dados + Narrativa", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Merge — Dados + Narrativa": {
+      "main": [
+        [
+          { "node": "Enviar Email", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["TI", "GLPI", "IA"],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-15T00:00:00.000Z",
+  "versionId": "1"
+}
