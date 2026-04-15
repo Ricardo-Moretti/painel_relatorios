@@ -187,7 +187,7 @@ export default function GlpiPage() {
           <div className="grid-4" style={{ marginBottom: '16px' }}>
             {card(<Monitor style={{ width: '16px', height: '16px', color: '#fc381d' }} />, 'Chamados Abertos', r.abertos, '#fc381d', `${r.envelhecidos} com mais de 45 dias`)}
             {card(<CheckCircle2 style={{ width: '16px', height: '16px', color: '#30d987' }} />, 'Solucionados Hoje', r.solucionadosHoje, '#30d987', `${r.fechadosHoje} fechados hoje`)}
-            {card(<Clock style={{ width: '16px', height: '16px', color: '#3794fc' }} />, 'Tempo Medio Solucao', `${r.tempoMedioSolucao}h`, '#3794fc', `Primeira resposta: ${r.tempoMedioResposta}h`)}
+            {card(<Clock style={{ width: '16px', height: '16px', color: '#3794fc' }} />, 'Tempo Medio Solucao', `${r.tempoMedioSolucao ?? 0}h`, '#3794fc', `Primeira resposta: ${r.tempoMedioResposta ?? 0}h`)}
             {card(<TrendingUp style={{ width: '16px', height: '16px', color: '#a037fc' }} />, `Solucionados ${dias}d`, r.solucionadosPeriodo, '#a037fc')}
           </div>
 
