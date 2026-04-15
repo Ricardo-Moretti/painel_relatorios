@@ -85,7 +85,7 @@ export const glpiAPI = {
 /** Serviços de IA */
 export const aiAPI = {
   anomalias: () => api.get('/ai/anomalias'),
-  chat: (pergunta) => api.post('/ai/chat', { pergunta }),
+  chat: (pergunta) => api.post('/ai/chat', { pergunta }, { timeout: 90000 }),
   resumoChamados: () => api.get('/ai/resumo-chamados'),
   previsao: () => api.get('/ai/previsao'),
 }

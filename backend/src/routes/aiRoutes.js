@@ -71,27 +71,23 @@ router.post('/chat', autenticar, async (req, res, next) => {
 
     const glpiConfigurado = glpiIntegracaoService.estaConfigurado();
     const d7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-    const d30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
     const hoje = new Date().toISOString().split('T')[0];
+    const timeout = (ms) => new Promise(r => setTimeout(() => r(null), ms));
 
-    const [
-      ultimasExecucoes,
-      historico30d,
-      errosConsecutivos,
-      semExecucao,
-      glpiHoje,
-      glpiPeriodo,
-      glpiBi,
-      relatorioDiario,
-    ] = await Promise.all([
-      rotinaRepository.buscarUltimasExecucoes(),
+    // Dados leves (MySQL local) — rápidos
+    const [ultimasExecucoes, historico30d, errosConsecutivos, semExecucao, glpiHoje, glpiPeriodo] = await Promise.all([
+      rotinaRepository.buscarUltimasExecucoes().catch(() => []),
       rotinaRepository.dadosTemporais(30).catch(() => []),
       rotinaRepository.errosConsecutivos().catch(() => []),
       rotinaRepository.rotinasSemExecucao(3).catch(() => []),
       glpiRepository.buscarHoje().catch(() => null),
       glpiRepository.buscarPorPeriodo(d7, hoje).catch(() => []),
-      glpiConfigurado ? glpiIntegracaoService.obterBI({ dias: 30 }).catch(() => null) : null,
-      glpiConfigurado ? glpiIntegracaoService.relatorioDiario().catch(() => null) : null,
+    ]);
+
+    // Dados GLPI pesados — timeout de 15s para não travar o chat
+    const [glpiBi, relatorioDiario] = await Promise.all([
+      glpiConfigurado ? Promise.race([glpiIntegracaoService.obterBI({ dias: 30 }), timeout(15000)]).catch(() => null) : null,
+      glpiConfigurado ? Promise.race([glpiIntegracaoService.relatorioDiario(), timeout(15000)]).catch(() => null) : null,
     ]);
 
     const snapshot = {
