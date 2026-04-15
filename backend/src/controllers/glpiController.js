@@ -146,9 +146,13 @@ const glpiController = {
   async enviarRelatorio(req, res, next) {
     try {
       const emailService = require('../services/emailService');
-      const dados = await glpiIntegracaoService.relatorioDiario();
-      await emailService.enviarRelatorioDiario(dados);
-      res.json({ sucesso: true, mensagem: 'Relatório enviado para n8n' });
+      // Responde imediatamente — coleta de dados e envio ao n8n rodam em background
+      // (relatorioDiario() tem 14+ queries sequenciais, pode levar >60s)
+      res.json({ sucesso: true, mensagem: 'Relatório sendo gerado e enviado em background...' });
+      glpiIntegracaoService.relatorioDiario()
+        .then(dados => emailService.enviarRelatorioDiario(dados))
+        .then(() => console.log('[Email] Relatório enviado ao n8n com sucesso'))
+        .catch(err => console.error('[Email] Erro ao enviar relatório:', err.message));
     } catch (error) { next(error); }
   },
 
