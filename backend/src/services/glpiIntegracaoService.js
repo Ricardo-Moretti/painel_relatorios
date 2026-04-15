@@ -195,10 +195,12 @@ const glpiIntegracaoService = {
       CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
       COUNT(DISTINCT t.id) as resolvidos
       FROM glpi_tickets t ${GF}
-      JOIN glpi_users u ON (
-        EXISTS (SELECT 1 FROM glpi_tickets_users tu WHERE tu.tickets_id = t.id AND tu.type = 2 AND tu.users_id = u.id)
-        OR EXISTS (SELECT 1 FROM glpi_itilsolutions sol WHERE sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4 AND sol.users_id = u.id)
-      )
+      JOIN (
+        SELECT tickets_id as tid, users_id FROM glpi_tickets_users WHERE type = 2
+        UNION
+        SELECT items_id as tid, users_id FROM glpi_itilsolutions WHERE itemtype = 'Ticket' AND status != 4
+      ) atu ON atu.tid = t.id
+      JOIN glpi_users u ON u.id = atu.users_id
       WHERE t.is_deleted = 0 ${EF}
         AND (t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) OR (t.status = 6 AND t.closedate >= DATE_SUB(NOW(), INTERVAL ? DAY)))
       GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias, dias]);
@@ -647,10 +649,12 @@ const glpiIntegracaoService = {
       CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
       COUNT(DISTINCT t.id) as resolvidos
       FROM glpi_tickets t ${GF}
-      JOIN glpi_users u ON (
-        EXISTS (SELECT 1 FROM glpi_tickets_users tu WHERE tu.tickets_id = t.id AND tu.type = 2 AND tu.users_id = u.id)
-        OR EXISTS (SELECT 1 FROM glpi_itilsolutions sol WHERE sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status != 4 AND sol.users_id = u.id)
-      )
+      JOIN (
+        SELECT tickets_id as tid, users_id FROM glpi_tickets_users WHERE type = 2
+        UNION
+        SELECT items_id as tid, users_id FROM glpi_itilsolutions WHERE itemtype = 'Ticket' AND status != 4
+      ) atu ON atu.tid = t.id
+      JOIN glpi_users u ON u.id = atu.users_id
       WHERE t.is_deleted = 0 ${EF}
         AND (DATE(t.solvedate) = CURDATE() OR (t.status = 6 AND DATE(t.closedate) = CURDATE()))
       GROUP BY u.id ORDER BY resolvidos DESC LIMIT 5`);
