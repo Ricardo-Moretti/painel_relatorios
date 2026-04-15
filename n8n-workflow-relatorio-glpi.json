@@ -12,7 +12,7 @@
       "name": "Webhook — Recebe do Backend",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
+      "position": [200, 300],
       "webhookId": "relatorio-glpi"
     },
     {
@@ -24,7 +24,7 @@
           "parameters": [
             {
               "name": "X-AI-Secret",
-              "value": "={{ $env.AI_WEBHOOK_SECRET }}"
+              "value": "painel-jd-ai-secret-2026"
             }
           ]
         },
@@ -36,34 +36,32 @@
       "name": "IA — Buscar Narrativa",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [460, 300]
+      "position": [440, 300]
     },
     {
       "parameters": {
-        "mode": "combine",
-        "combinationMode": "mergeByPosition",
-        "options": {}
+        "jsCode": "const d = $('Webhook — Recebe do Backend').first().json.body\n       || $('Webhook — Recebe do Backend').first().json;\nconst r   = d.resumo     || {};\nconst st  = d.porStatus  || {};\n\n// Narrativa IA\nlet narrativaHtml = '';\ntry {\n  const iaDados = $('IA — Buscar Narrativa').first().json;\n  if (iaDados && iaDados.sucesso && iaDados.narrativa) {\n    const texto = iaDados.narrativa.replace(/\\n/g, '<br>');\n    narrativaHtml = `\n      <tr><td style=\"background:#f0f7ee;padding:28px 44px;border-left:5px solid #367C2B\">\n        <p style=\"font-size:11px;font-weight:700;color:#367C2B;text-transform:uppercase;letter-spacing:1px;margin:0 0 10px;font-family:Segoe UI,Arial,sans-serif\">\n          ✨ Análise por Inteligência Artificial\n        </p>\n        <p style=\"font-size:14px;color:#1a3a14;line-height:1.75;margin:0;font-family:Segoe UI,Arial,sans-serif\">${texto}</p>\n      </td></tr>`;\n  }\n} catch(e) {}\n\nconst slaCor  = (p) => p >= 80 ? '#059669' : p >= 60 ? '#d97706' : '#dc2626';\nconst slaBg   = (p) => p >= 80 ? '#ecfdf5' : p >= 60 ? '#fffbeb' : '#fef2f2';\nconst varAbertos = (r.abertosHoje||0) - (r.abertosOntem||0);\nconst varSoluc   = (r.solucionadosHoje||0) - (r.solucionadosOntem||0);\nconst seta    = (v) => v > 0 ? '▲ +'+v : v < 0 ? '▼ '+v : '= 0';\nconst setCor  = (v, inv) => {\n  if (inv)  return v > 0 ? '#dc2626' : v < 0 ? '#059669' : '#64748b';\n  return v > 0 ? '#059669' : v < 0 ? '#dc2626' : '#64748b';\n};\n\nconst kpi = (label, valor, cor, bg) =>\n  `<td width=\"25%\" style=\"padding:4px\">\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n      <td style=\"background:${bg};padding:22px 12px;text-align:center;border:1px solid #e2e8f0\">\n        <p style=\"font-size:40px;font-weight:800;color:${cor};margin:0;line-height:1;font-family:Segoe UI,Arial,sans-serif\">${valor}</p>\n        <p style=\"font-size:10px;color:#64748b;margin:8px 0 0;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;font-family:Segoe UI,Arial,sans-serif\">${label}</p>\n      </td>\n    </tr></table>\n  </td>`;\n\nconst metrica = (emoji, label, valor, cor) =>\n  `<tr>\n    <td style=\"padding:14px 24px;font-size:14px;color:#475569;border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">${emoji} ${label}</td>\n    <td style=\"padding:14px 24px;font-size:17px;font-weight:800;text-align:right;color:${cor};border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">${valor}</td>\n  </tr>`;\n\nlet cats = '';\n(d.categoriasHoje || []).forEach((c, i) => {\n  const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';\n  cats += `<tr>\n    <td style=\"padding:12px 24px;font-size:14px;color:#334155;background:${bg};border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">${c.categoria}</td>\n    <td style=\"padding:12px 24px;font-size:16px;font-weight:700;text-align:right;color:#1e293b;background:${bg};border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">${c.qtd}</td>\n  </tr>`;\n});\n\nlet atds = '';\nconst medalhas = ['🥇','🥈','🥉'];\n(d.atendentesHoje || []).forEach((a, i) => {\n  const bg = i % 2 === 0 ? '#ffffff' : '#f8fafc';\n  const m  = medalhas[i] || `${i+1}.`;\n  atds += `<tr>\n    <td style=\"padding:12px 24px;font-size:14px;color:#334155;background:${bg};border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">${m} ${a.nome}</td>\n    <td style=\"padding:12px 24px;font-size:16px;font-weight:700;text-align:right;color:#059669;background:${bg};border-bottom:1px solid #e2e8f0;font-family:Segoe UI,Arial,sans-serif\">${a.resolvidos} ✓</td>\n  </tr>`;\n});\n\nconst html = `<!DOCTYPE html><html lang=\"pt-BR\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"></head>\n<body style=\"margin:0;padding:0;background:#e2e8f0;font-family:Segoe UI,Helvetica,Arial,sans-serif\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#e2e8f0;padding:32px 0\"><tr><td align=\"center\">\n<table width=\"660\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:660px;width:100%\">\n  <tr><td style=\"background:linear-gradient(135deg,#1D5016 0%,#367C2B 100%);padding:36px 44px\">\n    <table width=\"100%\"><tr><td>\n      <div style=\"display:inline-block;background:#FFDE00;padding:6px 14px;border-radius:6px;margin-bottom:14px\">\n        <span style=\"font-size:13px;font-weight:900;color:#1D5016;font-family:Segoe UI,Arial,sans-serif\">JOHN DEERE</span>\n      </div>\n      <h1 style=\"color:#ffffff;margin:0;font-size:22px;font-weight:800;font-family:Segoe UI,Arial,sans-serif\">📊 Relatório Diário — TI</h1>\n      <p style=\"color:rgba(255,255,255,0.7);margin:8px 0 0;font-size:13px;font-family:Segoe UI,Arial,sans-serif\">${d.dataFormatada||'Hoje'} | Grupo GLPI_TI | Tracbel Agro</p>\n    </td><td style=\"text-align:right;vertical-align:top\">\n      <p style=\"color:#FFDE00;font-size:11px;font-weight:700;margin:0\">AUTOMÁTICO</p>\n    </td></tr></table>\n  </td></tr>\n  ${narrativaHtml}\n  <tr><td style=\"background:#ffffff;padding:32px 40px 20px\">\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n      ${kpi('ABERTOS', r.abertos||0, '#dc2626', '#fef2f2')}\n      ${kpi('SOLUCIONADOS HOJE', r.solucionadosHoje||0, '#059669', '#ecfdf5')}\n      ${kpi('NOVOS HOJE', r.abertosHoje||0, '#1e40af', '#eff6ff')}\n      ${kpi('SLA SOLUÇÃO', (r.slaPct||0)+'%', slaCor(r.slaPct||0), slaBg(r.slaPct||0))}\n    </tr></table>\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-top:14px\"><tr>\n      <td style=\"padding:10px 16px;text-align:center;background:#f8fafc;border:1px solid #e2e8f0\">\n        <span style=\"font-size:12px;color:#64748b\">vs Ontem: </span>\n        <span style=\"font-size:13px;font-weight:700;color:${setCor(varAbertos,true)}\">${seta(varAbertos)} novos</span>\n        <span style=\"font-size:12px;color:#cbd5e1;margin:0 8px\">|</span>\n        <span style=\"font-size:13px;font-weight:700;color:${setCor(varSoluc,false)}\">${seta(varSoluc)} solucionados</span>\n      </td>\n    </tr></table>\n  </td></tr>\n  <tr><td style=\"background:#ffffff;padding:4px 40px 28px\">\n    <h3 style=\"font-size:13px;font-weight:700;color:#0f172a;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px\">📈 Métricas do Dia</h3>\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e2e8f0\">\n      ${metrica('🎯', 'SLA Atendimento (1ª resposta)', (r.slaAtenPct||0)+'%', slaCor(r.slaAtenPct||0))}\n      ${metrica('⏱️', 'Tempo médio de solução', (r.tempoMedioHoje||0)+'h', '#1e40af')}\n      ${metrica('⚡', 'Tempo médio 1ª resposta', (r.tempoRespostaHoje||0)+'h', '#7c3aed')}\n      ${metrica('🔴', 'Envelhecidos (mais de 45 dias)', r.envelhecidos||0, '#dc2626')}\n      ${metrica('🔄', 'Reaberturas hoje', r.reabertosHoje||0, '#d97706')}\n      ${metrica('🔒', 'Fechados hoje', r.fechadosHoje||0, '#334155')}\n    </table>\n  </td></tr>\n  <tr><td style=\"background:#ffffff;padding:4px 40px 28px\">\n    <h3 style=\"font-size:13px;font-weight:700;color:#0f172a;margin:0 0 12px;text-transform:uppercase;letter-spacing:0.5px\">📋 Status dos Chamados Abertos</h3>\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"4\"><tr>\n      <td width=\"25%\" style=\"text-align:center;padding:16px;background:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#334155;margin:0\">${st.novos||0}</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">⚪ Novos</p></td>\n      <td width=\"25%\" style=\"text-align:center;padding:16px;background:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#059669;margin:0\">${st.atribuidos||0}</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">🟢 Atribuídos</p></td>\n      <td width=\"25%\" style=\"text-align:center;padding:16px;background:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#d97706;margin:0\">${st.planejados||0}</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">🟡 Planejados</p></td>\n      <td width=\"25%\" style=\"text-align:center;padding:16px;background:#f8fafc;border:1px solid #e2e8f0\"><p style=\"font-size:28px;font-weight:800;color:#dc2626;margin:0\">${st.pendentes||0}</p><p style=\"font-size:11px;color:#64748b;margin:6px 0 0\">🟠 Pendentes</p></td>\n    </tr></table>\n  </td></tr>\n  ${cats ? `<tr><td style=\"background:#ffffff;padding:4px 40px 28px\"><h3 style=\"font-size:13px;font-weight:700;color:#0f172a;margin:0 0 12px;text-transform:uppercase\">📂 Top Categorias do Dia</h3><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e2e8f0\">${cats}</table></td></tr>` : ''}\n  ${atds ? `<tr><td style=\"background:#ffffff;padding:4px 40px 28px\"><h3 style=\"font-size:13px;font-weight:700;color:#0f172a;margin:0 0 12px;text-transform:uppercase\">🏆 Top Atendentes do Dia</h3><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e2e8f0\">${atds}</table></td></tr>` : ''}\n  <tr><td style=\"background:#1D5016;padding:24px 44px;text-align:center\">\n    <p style=\"font-size:12px;color:rgba(255,255,255,0.7);margin:0;font-family:Segoe UI,Arial,sans-serif\">\n      <strong style=\"color:#FFDE00\">Painel de Rotinas TI</strong> · John Deere Tracbel Agro<br>\n      Relatório gerado automaticamente — Não responda este email.\n    </p>\n  </td></tr>\n</table></td></tr></table></body></html>`;\n\nconst assunto = `📊 Relatório TI — ${r.solucionadosHoje||0} solucionados | ${r.abertos||0} abertos | SLA ${r.slaPct||0}% | ${d.dataFormatada||'Hoje'}`;\n\nreturn [{ json: { html, assunto } }];"
       },
-      "id": "merge-dados",
-      "name": "Merge — Dados + Narrativa",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
+      "id": "code-email",
+      "name": "Code — Gerar HTML Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [680, 300]
     },
     {
       "parameters": {
-        "fromEmail": "ti@tracbel.com.br",
-        "toEmail": "={{ $env.EMAIL_DESTINATARIOS }}",
-        "subject": "=📊 Relatório TI — {{ $now.setLocale('pt').toFormat('dd/MM/yyyy') }}",
+        "fromEmail": "noreply_agro@tracbel.com.br",
+        "toEmail": "email1@tracbel.com.br, email2@tracbel.com.br",
+        "subject": "={{ $json.assunto }}",
         "emailFormat": "html",
-        "html": "=<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f6fa; margin: 0; padding: 20px; }\n    .container { max-width: 640px; margin: 0 auto; }\n    .header { background: linear-gradient(135deg, #1D5016 0%, #367C2B 100%); border-radius: 14px 14px 0 0; padding: 28px 32px; text-align: center; }\n    .header h1 { color: #FFDE00; font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.5px; }\n    .header p { color: rgba(255,255,255,0.7); font-size: 13px; margin: 6px 0 0; }\n    .body { background: #fff; padding: 28px 32px; border-radius: 0 0 14px 14px; border: 1px solid #e2e8f0; border-top: none; }\n    .narrativa { background: #f0f7ee; border-left: 4px solid #367C2B; border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 24px; font-size: 14px; line-height: 1.7; color: #1a3a14; }\n    .narrativa-label { font-size: 10px; font-weight: 700; color: #367C2B; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }\n    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }\n    .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; text-align: center; }\n    .kpi-valor { font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1; }\n    .kpi-label { font-size: 11px; color: #64748b; margin-top: 4px; font-weight: 500; }\n    .section-title { font-size: 13px; font-weight: 700; color: #0f172a; margin: 20px 0 10px; text-transform: uppercase; letter-spacing: 0.04em; }\n    .atendente-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; background: #f8fafc; }\n    .atendente-nome { font-size: 13px; color: #334155; font-weight: 500; }\n    .atendente-qtd { font-size: 13px; font-weight: 800; color: #367C2B; }\n    .categoria-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-radius: 6px; margin-bottom: 3px; }\n    .categoria-nome { font-size: 12px; color: #475569; }\n    .categoria-qtd { font-size: 12px; font-weight: 700; color: #64748b; }\n    .sla-bar { height: 8px; border-radius: 4px; background: #e2e8f0; margin-top: 8px; overflow: hidden; }\n    .sla-fill { height: 100%; border-radius: 4px; }\n    .footer { text-align: center; padding: 16px; font-size: 11px; color: #94a3b8; }\n    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }\n    .badge-green { background: #f0fdf4; color: #16a34a; }\n    .badge-red { background: #fef2f2; color: #ef4444; }\n    .badge-amber { background: #fffbeb; color: #d97706; }\n  </style>\n</head>\n<body>\n<div class=\"container\">\n  \n  <!-- Header -->\n  <div class=\"header\">\n    <h1>JOHN DEERE — Relatório TI</h1>\n    <p>{{ $now.setLocale('pt').toFormat('cccc, dd \\\"de\\\" MMMM \\\"de\\\" yyyy') }}</p>\n  </div>\n\n  <div class=\"body\">\n\n    <!-- Narrativa IA -->\n    {{ $('IA — Buscar Narrativa').item.json.sucesso ? '<div class=\"narrativa\"><div class=\"narrativa-label\">✨ Análise por Inteligência Artificial</div>' + $('IA — Buscar Narrativa').item.json.narrativa.replace(/\\n/g, '<br>') + '</div>' : '' }}\n\n    <!-- KPIs principais -->\n    <div class=\"kpis\">\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #ef4444;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.abertos ?? 0 }}</div>\n        <div class=\"kpi-label\">Abertos</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #16a34a;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.solucionadosHoje ?? 0 }}</div>\n        <div class=\"kpi-label\">Solucionados Hoje</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: {{ ($('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0) >= 80 ? '#16a34a' : '#ef4444' }};\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0 }}%</div>\n        <div class=\"kpi-label\">SLA</div>\n      </div>\n    </div>\n\n    <div class=\"kpis\">\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #f59e0b;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.envelhecidos ?? 0 }}</div>\n        <div class=\"kpi-label\">+45 dias (envelhec.)</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #3b82f6;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.tempoMedioSolucao ?? 0 }}h</div>\n        <div class=\"kpi-label\">Tempo Médio Solução</div>\n      </div>\n      <div class=\"kpi\">\n        <div class=\"kpi-valor\" style=\"color: #8b5cf6;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.solucionadosPeriodo ?? 0 }}</div>\n        <div class=\"kpi-label\">Solucionados 30d</div>\n      </div>\n    </div>\n\n    <!-- SLA bar -->\n    <div class=\"section-title\">SLA do Período</div>\n    <div class=\"sla-bar\">\n      <div class=\"sla-fill\" style=\"width: {{ $('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0 }}%; background: {{ ($('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0) >= 80 ? '#16a34a' : ($('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0) >= 60 ? '#f59e0b' : '#ef4444' }};\"></div>\n    </div>\n    <p style=\"font-size: 12px; color: #64748b; margin: 4px 0 0; text-align: right;\">{{ $('Webhook — Recebe do Backend').item.json.resumo?.slaPct ?? 0 }}% dentro do prazo</p>\n\n    <!-- Top Atendentes -->\n    {{ $('Webhook — Recebe do Backend').item.json.atendentesHoje?.length ? '<div class=\"section-title\">🏆 Top Atendentes Hoje</div>' : '' }}\n    {{ $('Webhook — Recebe do Backend').item.json.atendentesHoje?.map((a, i) => `<div class=\"atendente-row\"><span class=\"atendente-nome\">${i + 1}. ${a.nome}</span><span class=\"atendente-qtd\">${a.resolvidos} ✓</span></div>`).join('') ?? '' }}\n\n    <!-- Top Categorias -->\n    {{ $('Webhook — Recebe do Backend').item.json.categoriasHoje?.length ? '<div class=\"section-title\" style=\"margin-top: 20px;\">📂 Categorias com Mais Chamados Hoje</div>' : '' }}\n    {{ $('Webhook — Recebe do Backend').item.json.categoriasHoje?.map(c => `<div class=\"categoria-row\"><span class=\"categoria-nome\">${c.categoria}</span><span class=\"categoria-qtd\">${c.qtd}</span></div>`).join('') ?? '' }}\n\n  </div>\n\n  <!-- Footer -->\n  <div class=\"footer\">\n    Gerado automaticamente pelo Painel de Rotinas TI · John Deere<br>\n    {{ $now.setLocale('pt').toFormat('dd/MM/yyyy HH:mm') }}\n  </div>\n\n</div>\n</body>\n</html>",
+        "html": "={{ $json.html }}",
         "options": {}
       },
       "id": "send-email",
       "name": "Enviar Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
-      "position": [900, 300]
+      "position": [920, 300]
     },
     {
       "parameters": {
@@ -75,7 +73,7 @@
       "name": "Responder Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [900, 460]
+      "position": [920, 460]
     }
   ],
   "connections": {
@@ -83,7 +81,6 @@
       "main": [
         [
           { "node": "IA — Buscar Narrativa", "type": "main", "index": 0 },
-          { "node": "Merge — Dados + Narrativa", "type": "main", "index": 1 },
           { "node": "Responder Webhook", "type": "main", "index": 0 }
         ]
       ]
@@ -91,11 +88,11 @@
     "IA — Buscar Narrativa": {
       "main": [
         [
-          { "node": "Merge — Dados + Narrativa", "type": "main", "index": 0 }
+          { "node": "Code — Gerar HTML Email", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Merge — Dados + Narrativa": {
+    "Code — Gerar HTML Email": {
       "main": [
         [
           { "node": "Enviar Email", "type": "main", "index": 0 }
@@ -106,9 +103,6 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
   "tags": ["TI", "GLPI", "IA"],
-  "triggerCount": 1,
-  "updatedAt": "2026-04-15T00:00:00.000Z",
-  "versionId": "1"
+  "triggerCount": 1
 }
