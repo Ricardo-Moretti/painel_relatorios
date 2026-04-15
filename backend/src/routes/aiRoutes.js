@@ -69,32 +69,65 @@ router.post('/chat', autenticar, async (req, res, next) => {
       return res.status(429).json({ sucesso: false, mensagem: 'Limite de 20 perguntas por hora atingido' });
     }
 
-    const [ultimasExecucoes, glpiHoje, glpiPeriodo, glpiBi] = await Promise.all([
+    const glpiConfigurado = glpiIntegracaoService.estaConfigurado();
+    const d7 = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+    const d30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+    const hoje = new Date().toISOString().split('T')[0];
+
+    const [
+      ultimasExecucoes,
+      historico30d,
+      errosConsecutivos,
+      semExecucao,
+      glpiHoje,
+      glpiPeriodo,
+      glpiBi,
+      relatorioDiario,
+    ] = await Promise.all([
       rotinaRepository.buscarUltimasExecucoes(),
+      rotinaRepository.dadosTemporais(30).catch(() => []),
+      rotinaRepository.errosConsecutivos().catch(() => []),
+      rotinaRepository.rotinasSemExecucao(3).catch(() => []),
       glpiRepository.buscarHoje().catch(() => null),
-      glpiRepository.buscarPorPeriodo(
-        new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
-        new Date().toISOString().split('T')[0]
-      ).catch(() => []),
-      glpiIntegracaoService.estaConfigurado()
-        ? glpiIntegracaoService.obterBI({ dias: 30 }).catch(() => null)
-        : null,
+      glpiRepository.buscarPorPeriodo(d7, hoje).catch(() => []),
+      glpiConfigurado ? glpiIntegracaoService.obterBI({ dias: 30 }).catch(() => null) : null,
+      glpiConfigurado ? glpiIntegracaoService.relatorioDiario().catch(() => null) : null,
     ]);
 
     const snapshot = {
-      rotinas: ultimasExecucoes,
-      glpiHoje,
-      glpiUltimos7d: glpiPeriodo,
-      glpiBI: glpiBi ? {
-        abertos: glpiBi.resumo?.abertos,
-        envelhecidos: glpiBi.resumo?.envelhecidos,
-        solucionadosHoje: glpiBi.resumo?.solucionadosHoje,
-        solucionadosPeriodo: glpiBi.resumo?.solucionadosPeriodo,
-        slaPct: glpiBi.resumo?.slaPct,
-        tempoMedioSolucao: glpiBi.resumo?.tempoMedioSolucao,
-        topAtendentes: glpiBi.atendentes?.slice(0, 5),
-        topCategorias: glpiBi.categorias?.slice(0, 5),
-      } : null,
+      produto: 'Painel de Rotinas TI — John Deere Tracbel',
+      dataHoje: hoje,
+      paginas: {
+        dashboard: {
+          descricao: 'Status atual de todas as rotinas de TI monitoradas',
+          ultimaExecucaoCadaRotina: ultimasExecucoes,
+          historico30dias: historico30d,
+          alertas: {
+            errosConsecutivos,
+            rotinasSemExecucao: semExecucao,
+          },
+        },
+        glpiBI: glpiBi ? {
+          descricao: 'Business Intelligence de chamados GLPI do grupo GLPI_TI',
+          resumo: glpiBi.resumo,
+          topAtendentes: glpiBi.atendentes?.slice(0, 10),
+          topCategorias: glpiBi.categorias?.slice(0, 10),
+          porStatus: glpiBi.porStatus,
+          slaDetalhado: glpiBi.sla,
+          tendenciaSemanal: glpiBi.tendenciaSemanal,
+          topSolicitantes: glpiBi.topSolicitantes?.slice(0, 5),
+          tempoAtendentes: glpiBi.tempoAtendentes?.slice(0, 5),
+        } : null,
+        relatorioDiarioHoje: relatorioDiario ? {
+          resumo: relatorioDiario.resumo,
+          atendentesHoje: relatorioDiario.atendentesHoje,
+          categoriasHoje: relatorioDiario.categoriasHoje,
+        } : null,
+        glpiIndicadores: {
+          hoje: glpiHoje,
+          ultimos7dias: glpiPeriodo,
+        },
+      },
     };
     const resposta = await aiService.responderChat(pergunta.trim(), snapshot);
     res.json({ sucesso: true, resposta });
