@@ -69,16 +69,33 @@ router.post('/chat', autenticar, async (req, res, next) => {
       return res.status(429).json({ sucesso: false, mensagem: 'Limite de 20 perguntas por hora atingido' });
     }
 
-    const [ultimasExecucoes, glpiHoje, glpiPeriodo] = await Promise.all([
+    const [ultimasExecucoes, glpiHoje, glpiPeriodo, glpiBi] = await Promise.all([
       rotinaRepository.buscarUltimasExecucoes(),
       glpiRepository.buscarHoje().catch(() => null),
       glpiRepository.buscarPorPeriodo(
         new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
         new Date().toISOString().split('T')[0]
       ).catch(() => []),
+      glpiIntegracaoService.estaConfigurado()
+        ? glpiIntegracaoService.obterBI({ dias: 30 }).catch(() => null)
+        : null,
     ]);
 
-    const snapshot = { rotinas: ultimasExecucoes, glpiHoje, glpiUltimos7d: glpiPeriodo };
+    const snapshot = {
+      rotinas: ultimasExecucoes,
+      glpiHoje,
+      glpiUltimos7d: glpiPeriodo,
+      glpiBI: glpiBi ? {
+        abertos: glpiBi.resumo?.abertos,
+        envelhecidos: glpiBi.resumo?.envelhecidos,
+        solucionadosHoje: glpiBi.resumo?.solucionadosHoje,
+        solucionadosPeriodo: glpiBi.resumo?.solucionadosPeriodo,
+        slaPct: glpiBi.resumo?.slaPct,
+        tempoMedioSolucao: glpiBi.resumo?.tempoMedioSolucao,
+        topAtendentes: glpiBi.atendentes?.slice(0, 5),
+        topCategorias: glpiBi.categorias?.slice(0, 5),
+      } : null,
+    };
     const resposta = await aiService.responderChat(pergunta.trim(), snapshot);
     res.json({ sucesso: true, resposta });
   } catch (e) { next(e); }
