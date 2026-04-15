@@ -152,14 +152,22 @@ const glpiController = {
 
       glpiIntegracaoService.relatorioDiario()
         .then(async (dados) => {
-          // Gera narrativa IA no backend e inclui no payload
+          // Busca histórico dos últimos 10 dias para análise de tendência
+          let historico10d = [];
+          try {
+            const d10 = new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0];
+            const hoje = new Date().toISOString().split('T')[0];
+            historico10d = await glpiRepository.buscarPorPeriodo(d10, hoje);
+          } catch (e) { /* sem histórico, sem problema */ }
+
+          // Gera narrativa IA com resumo do dia + tendência 10 dias
           let narrativa = '';
           try {
-            narrativa = await aiService.gerarNarrativa(dados.resumo);
+            narrativa = await aiService.gerarNarrativa(dados.resumo, historico10d);
           } catch (e) {
             console.warn('[Email] Narrativa IA falhou, enviando sem ela:', e.message);
           }
-          return emailService.enviarRelatorioDiario({ ...dados, narrativa });
+          return emailService.enviarRelatorioDiario({ ...dados, narrativa, historico10d });
         })
         .then(() => console.log('[Email] Relatório enviado ao n8n com sucesso'))
         .catch(err => console.error('[Email] Erro ao enviar relatório:', err.message));

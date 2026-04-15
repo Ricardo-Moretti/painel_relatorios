@@ -19,25 +19,40 @@ const aiService = {
    * Feature 1 — Narrativa para o email diário
    * Gera texto executivo com base nas métricas do dia
    */
-  async gerarNarrativa(metricas) {
+  async gerarNarrativa(metricas, historico10d = []) {
     const client = getClient();
+
+    // Analisa tendência dos 10 dias
+    let tendenciaTexto = '';
+    if (historico10d.length >= 2) {
+      const qtds = historico10d.map(d => parseInt(d.quantidade) || 0);
+      const envs = historico10d.map(d => parseInt(d.envelhecidos) || 0);
+      const mediaQtd = (qtds.reduce((a, b) => a + b, 0) / qtds.length).toFixed(0);
+      const primeiros5 = qtds.slice(0, 5).reduce((a, b) => a + b, 0) / 5;
+      const ultimos5   = qtds.slice(-5).reduce((a, b) => a + b, 0) / 5;
+      const tendencia  = ultimos5 > primeiros5 * 1.1 ? 'crescente' : ultimos5 < primeiros5 * 0.9 ? 'decrescente' : 'estável';
+      const maxEnv     = Math.max(...envs);
+      const minEnv     = Math.min(...envs);
+      tendenciaTexto = `\n\nHistórico últimos ${historico10d.length} dias:\n${JSON.stringify(historico10d.map(d => ({ data: d.data, abertos: d.quantidade, envelhecidos: d.envelhecidos })), null, 2)}\nMédia de abertos: ${mediaQtd} | Tendência: ${tendencia} | Envelhecidos: min ${minEnv}, max ${maxEnv}`;
+    }
+
     const prompt = `Dados do relatório de TI de hoje:
-${JSON.stringify(metricas, null, 2)}
+${JSON.stringify(metricas, null, 2)}${tendenciaTexto}
 
 Redija uma narrativa executiva em português brasileiro com 3 parágrafos:
 1. Situação atual do dia (chamados abertos, solucionados, SLA)
-2. Destaques positivos e desempenho da equipe
-3. Pontos de atenção e recomendações
+2. Análise da tendência dos últimos 10 dias — destaque se houve melhora, piora ou estabilidade no volume de chamados e nos envelhecidos. Use dados concretos.
+3. Pontos de atenção prioritários e recomendações objetivas
 
-Use linguagem profissional e objetiva. Não use markdown, apenas texto puro. Máximo 250 palavras.`;
+Use linguagem profissional. Não use markdown, apenas texto puro. Máximo 280 palavras.`;
 
     const res = await client.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: 'Você é um assistente de TI que redige relatórios executivos em português brasileiro formal, conciso e orientado a resultados.' },
+        { role: 'system', content: 'Você é um analista de TI que redige relatórios executivos em português brasileiro formal, conciso e orientado a resultados. Quando tiver dados históricos, destaque tendências com números concretos.' },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 600,
+      max_tokens: 650,
       temperature: 0.4,
     });
     return res.choices[0].message.content.trim();
