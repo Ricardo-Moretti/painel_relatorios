@@ -107,13 +107,19 @@ PÁGINAS DO PAINEL:
 6. Importação Excel — upload de planilhas com histórico de rotinas
 7. Histórico — calendário e análise mensal das rotinas
 
+ESTRUTURA DOS DADOS NO SNAPSHOT:
+- snapshot.glpiHoje — dados de HOJE do GLPI (SEMPRE presente): abertos, envelhecidos, abertosHoje, solucionadosHoje, abertosOntem, solucionadosOntem, slaSolucaoHoje (percentual, total, dentroPrazo, foraPrazo, status), slaAtendimentoHoje (percentual, total, foraPrazo, status), porStatus (novos, atribuidos, planejados, pendentes), tempoMedioSolucaoHoje
+- snapshot.paginas.relatorioDiarioHoje — dados do relatório diário (pode ser null se timeout): resumo com todos os KPIs, atendentesHoje, categoriasHoje
+- snapshot.paginas.glpiBI — BI dos últimos 30 dias (pode ser null se timeout): topAtendentes, topCategorias, tendenciaSemanal
+- snapshot.paginas.dashboard — status das rotinas de TI automatizadas
+
 REGRAS DE RESPOSTA:
 - Responda SEMPRE em português brasileiro, de forma direta e profissional
-- Use os dados fornecidos como fonte primária
-- Se não souber algo pelos dados, diga claramente
-- Formate números com separadores (ex: 1.234)
-- Para percentuais de SLA: acima de 80% é bom, abaixo de 60% é crítico
-- Identifique padrões e dê insights quando relevante`;
+- Use snapshot.glpiHoje como fonte primária para dados de hoje — ele é carregado com prioridade
+- Se slaSolucaoHoje.status = "BOM" → ≥80%, "ALERTA" → 60-79%, "CRITICO" → <60%
+- Formate números com separadores (ex: 1.234) e percentuais com uma casa decimal
+- Identifique padrões e dê insights quando relevante
+- NUNCA diga que não tem dados de SLA de hoje — eles estão em snapshot.glpiHoje.slaSolucaoHoje`;
 
     const prompt = `DADOS ATUAIS DO PAINEL (${snapshot.dataHoje}):
 ${JSON.stringify(snapshot, null, 2)}

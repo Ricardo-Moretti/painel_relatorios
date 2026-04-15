@@ -1026,6 +1026,67 @@ const glpiIntegracaoService = {
     return rows.map(r => r.name).filter(Boolean);
   },
 
+  /**
+   * Resumo rápido para o chat da IA — queries paralelas, <5s
+   * Retorna os KPIs mais importantes sem o overhead do relatorioDiario completo
+   */
+  async resumoRapidoParaChat() {
+    const p = this._getPool();
+    const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
+    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const n = (v) => parseInt(v) || 0;
+
+    const [
+      [abertos], [envelhecidos], [abertosHoje], [solucionadosHoje],
+      [slaHoje], [slaAtenHoje], [porStatus], [tempoHoje], [abertosOntem], [solucionadosOntem]
+    ] = await Promise.all([
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`),
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF} AND t.date < DATE_SUB(NOW(), INTERVAL 45 DAY)`),
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}`),
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND DATE(t.solvedate) = CURDATE()`),
+      p.execute(`SELECT COUNT(*) as total, SUM(CASE WHEN t.time_to_resolve IS NOT NULL AND t.solvedate <= t.time_to_resolve THEN 1 ELSE 0 END) as dentro FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND DATE(t.solvedate) = CURDATE() AND t.time_to_resolve IS NOT NULL AND t.is_deleted = 0 ${EF}`),
+      p.execute(`SELECT COUNT(*) as total, SUM(CASE WHEN t.time_to_own IS NOT NULL AND t.status <> 4 AND ((t.takeintoaccount_delay_stat > TIMESTAMPDIFF(SECOND, t.date, t.time_to_own)) OR (t.takeintoaccount_delay_stat = 0 AND t.time_to_own < NOW())) THEN 1 ELSE 0 END) as fora FROM glpi_tickets t ${GF} WHERE DATE(t.date) = CURDATE() AND t.is_deleted = 0 ${EF}`),
+      p.execute(`SELECT SUM(CASE WHEN t.status=1 THEN 1 ELSE 0 END) as novos, SUM(CASE WHEN t.status=2 THEN 1 ELSE 0 END) as atribuidos, SUM(CASE WHEN t.status=3 THEN 1 ELSE 0 END) as planejados, SUM(CASE WHEN t.status=4 THEN 1 ELSE 0 END) as pendentes FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`),
+      p.execute(`SELECT ROUND(AVG(t.solve_delay_stat/3600),1) as media FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND DATE(t.solvedate) = CURDATE() AND t.is_deleted = 0 ${EF}`),
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE DATE(t.date) = DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND t.is_deleted = 0 ${EF}`),
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND DATE(t.solvedate) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`),
+    ]);
+
+    const slaPct = slaHoje[0].total > 0 ? +(((parseInt(slaHoje[0].dentro) || 0) / slaHoje[0].total) * 100).toFixed(1) : 0;
+    const slaAtenPct = slaAtenHoje[0].total > 0 ? +(((slaAtenHoje[0].total - n(slaAtenHoje[0].fora)) / slaAtenHoje[0].total) * 100).toFixed(1) : 0;
+
+    return {
+      dataHoje: new Date().toLocaleDateString('pt-BR'),
+      abertos: n(abertos[0].total),
+      envelhecidos: n(envelhecidos[0].total),
+      abertosHoje: n(abertosHoje[0].total),
+      solucionadosHoje: n(solucionadosHoje[0].total),
+      abertosOntem: n(abertosOntem[0].total),
+      solucionadosOntem: n(solucionadosOntem[0].total),
+      slaSolucaoHoje: {
+        percentual: slaPct,
+        total: n(slaHoje[0].total),
+        dentroPrazo: n(slaHoje[0].dentro),
+        foraPrazo: n(slaHoje[0].total) - n(slaHoje[0].dentro),
+        meta: '80%',
+        status: slaPct >= 80 ? 'BOM' : slaPct >= 60 ? 'ALERTA' : 'CRITICO',
+      },
+      slaAtendimentoHoje: {
+        percentual: slaAtenPct,
+        total: n(slaAtenHoje[0].total),
+        foraPrazo: n(slaAtenHoje[0].fora),
+        status: slaAtenPct >= 80 ? 'BOM' : slaAtenPct >= 60 ? 'ALERTA' : 'CRITICO',
+      },
+      porStatus: {
+        novos: n(porStatus[0].novos),
+        atribuidos: n(porStatus[0].atribuidos),
+        planejados: n(porStatus[0].planejados),
+        pendentes: n(porStatus[0].pendentes),
+      },
+      tempoMedioSolucaoHoje: parseFloat(tempoHoje[0].media) || 0,
+    };
+  },
+
   /** Testa conexão */
   async testarConexao() {
     const p = this._getPool();

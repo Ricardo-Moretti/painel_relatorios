@@ -84,15 +84,18 @@ router.post('/chat', autenticar, async (req, res, next) => {
       glpiRepository.buscarPorPeriodo(d7, hoje).catch(() => []),
     ]);
 
-    // Dados GLPI pesados — timeout de 15s para não travar o chat
-    const [glpiBi, relatorioDiario] = await Promise.all([
-      glpiConfigurado ? Promise.race([glpiIntegracaoService.obterBI({ dias: 30 }), timeout(15000)]).catch(() => null) : null,
-      glpiConfigurado ? Promise.race([glpiIntegracaoService.relatorioDiario(), timeout(15000)]).catch(() => null) : null,
+    // Dados GLPI — resumo rápido (paralelo, ~5s) + dados pesados com timeout
+    const [resumoRapido, glpiBi, relatorioDiario] = await Promise.all([
+      glpiConfigurado ? Promise.race([glpiIntegracaoService.resumoRapidoParaChat(), timeout(20000)]).catch(() => null) : null,
+      glpiConfigurado ? Promise.race([glpiIntegracaoService.obterBI({ dias: 30 }), timeout(20000)]).catch(() => null) : null,
+      glpiConfigurado ? Promise.race([glpiIntegracaoService.relatorioDiario(), timeout(25000)]).catch(() => null) : null,
     ]);
 
     const snapshot = {
       produto: 'Painel de Rotinas TI — John Deere Tracbel',
       dataHoje: hoje,
+      // Dados GLPI de hoje — SEMPRE presentes (resumoRapido usa queries paralelas)
+      glpiHoje: resumoRapido || null,
       paginas: {
         dashboard: {
           descricao: 'Status atual de todas as rotinas de TI monitoradas',
