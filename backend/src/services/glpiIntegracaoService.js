@@ -64,10 +64,28 @@ const glpiIntegracaoService = {
         keepAliveInitialDelay: 10000,
       });
 
+      // READ UNCOMMITTED: sem shared locks — não bloqueia escritas do GLPI web
+      // MAX_EXECUTION_TIME: mata queries que travem por mais de 12s
+      pool.on('connection', (conn) => {
+        conn.query('SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED');
+        conn.query('SET SESSION MAX_EXECUTION_TIME=12000');
+      });
+
       // Log connection info without password
       console.log(`[GLPI MySQL] Pool criado: ${user}@${host}/${database} (senha ocultada)`);
     }
     return pool;
+  },
+
+  /** Retorna filtro SQL de entidades parceiras — pré-calculado e cacheado 30 min */
+  async _getEF() {
+    const cached = this._lerCache('glpi_ef_parceiros');
+    if (cached !== null) return cached;
+    const p = this._getPool();
+    const [rows] = await p.execute(`SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%'`);
+    const ef = rows.length > 0 ? `AND t.entities_id NOT IN (${rows.map(r => r.id).join(',')})` : '';
+    this._salvarCache('glpi_ef_parceiros', ef, 30);
+    return ef;
   },
 
   /** Busca total de chamados não solucionados do grupo GLPI_TI */
@@ -159,7 +177,7 @@ const glpiIntegracaoService = {
   async obterBI({ dias = 30 } = {}) {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
     const urgNomes = {1:'Muito baixa',2:'Baixa',3:'Média',4:'Alta',5:'Muito alta'};
 
     const [
@@ -373,7 +391,7 @@ const glpiIntegracaoService = {
   async obterSLADetalhado({ dias = 30 } = {}) {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const ENTIDADE_FILTER = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const ENTIDADE_FILTER = await this._getEF();
     const prioNomes = {1:'Muito baixa',2:'Baixa',3:'Média',4:'Alta',5:'Muito alta',6:'Crítica'};
     const prioIcones = {1:'⚪',2:'🟢',3:'🟡',4:'🟠',5:'🔴',6:'🟣'};
     const statusNomes = {1:'Novo',2:'Atribuído',3:'Planejado',4:'Pendente',5:'Solucionado',6:'Fechado'};
@@ -610,7 +628,7 @@ const glpiIntegracaoService = {
   async relatorioDiario() {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
 
     const [abertos] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`);
     const [envelhecidos] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF} AND t.date < DATE_SUB(NOW(), INTERVAL 45 DAY)`);
@@ -724,7 +742,7 @@ const glpiIntegracaoService = {
   async explorarChamados({ dias = 90, categoria, atendente, status, urgencia, prioridade, busca, ordenar = 'recentes', limite = 50, pagina = 0 } = {}) {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
 
     let where = `t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`;
     const params = [dias];
@@ -805,7 +823,7 @@ const glpiIntegracaoService = {
   async listarFiltros() {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
 
     const [categorias] = await p.execute(`SELECT DISTINCT
       REPLACE(COALESCE(c.completename, 'Sem categoria'), 'TECNOLOGIA DA INFORMAÇÃO', 'TI') as nome,
@@ -859,7 +877,7 @@ const glpiIntegracaoService = {
   async compararMeses() {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
 
     // Helper: stats for a given month (YYYY-MM format)
     const statsMes = async (ano, mes) => {
@@ -963,7 +981,7 @@ const glpiIntegracaoService = {
   async metricasPorCategoria({ dias = 90 } = {}) {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
 
     // Categorias monitoradas com IDs
     const categorias = [
@@ -1020,7 +1038,7 @@ const glpiIntegracaoService = {
   async buscarTitulosChamadosAbertos() {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
     const [rows] = await p.execute(
       `SELECT t.name FROM glpi_tickets t ${GF}
        WHERE t.status < 5 AND t.is_deleted = 0 ${EF}
@@ -1036,7 +1054,7 @@ const glpiIntegracaoService = {
   async resumoRapidoParaChat() {
     const p = this._getPool();
     const GF = `INNER JOIN glpi_groups_tickets gt ON gt.tickets_id = t.id AND gt.type = 2 AND gt.groups_id = ${GRUPO_TI_ID}`;
-    const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
+    const EF = await this._getEF();
     const n = (v) => parseInt(v) || 0;
 
     const [
