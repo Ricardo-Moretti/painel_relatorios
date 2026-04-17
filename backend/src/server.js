@@ -144,14 +144,19 @@ function agendarColetaGlpi() {
 const emailService = require('./services/emailService');
 
 function agendarRelatorioDiario() {
+  let ultimoEnvio = null; // data 'YYYY-MM-DD' do último envio — evita duplicata
+
   function verificarHorario() {
     const agora = new Date();
     const hora = agora.getHours();
     const minuto = agora.getMinutes();
     const diaSemana = agora.getDay(); // 0=dom, 6=sab
+    const hoje = agora.toISOString().split('T')[0];
 
-    // 18:00 seg-sex
-    if (hora === 17 && minuto === 40 && diaSemana >= 1 && diaSemana <= 5) {
+    // Janela 17:40–17:44 seg-sex, uma vez por dia
+    const naJanela = hora === 17 && minuto >= 40 && minuto <= 44;
+    if (naJanela && diaSemana >= 1 && diaSemana <= 5 && ultimoEnvio !== hoje) {
+      ultimoEnvio = hoje; // marca antes de disparar para evitar duplicata
       console.log('[Relatorio] Disparando relatório diário...');
       glpiIntegracaoService.relatorioDiario()
         .then(dados => {
@@ -159,13 +164,20 @@ function agendarRelatorioDiario() {
           return emailService.enviarRelatorioDiario(dados);
         })
         .then(() => console.log('[Relatorio] Enviado para n8n com sucesso'))
-        .catch(e => console.error(`[Relatorio] Falhou: ${e.message}`, e.stack));
+        .catch(e => {
+          ultimoEnvio = null; // libera para tentar novamente se falhou
+          console.error(`[Relatorio] Falhou: ${e.message}`, e.stack);
+        });
     }
   }
 
   // Verificar a cada minuto
   setInterval(verificarHorario, 60000);
-  console.log('Relatorio diario agendado (18h seg-sex via n8n)');
+
+  // Disparar imediatamente se o servidor subiu dentro da janela de hoje (catch-up)
+  verificarHorario();
+
+  console.log('Relatorio diario agendado (17:40 seg-sex)');
 }
 
 // Inicializar banco e servidor
