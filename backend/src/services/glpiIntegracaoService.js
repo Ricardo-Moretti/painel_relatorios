@@ -12,6 +12,8 @@ require('dotenv').config();
 
 let pool = null;
 
+const _memCache = new Map(); // chave → { data, expiresAt }
+
 // ID do grupo GLPI_TI — filtrar apenas chamados desse grupo
 // Seguro para interpolação em SQL: sempre validado como inteiro (nunca vem de input do usuário)
 const GRUPO_TI_ID = parseInt(process.env.GLPI_GRUPO_TI_ID) || 1;
@@ -20,7 +22,8 @@ if (!Number.isInteger(GRUPO_TI_ID)) throw new Error('GRUPO_TI_ID must be integer
 const glpiIntegracaoService = {
 
   /** Salva dados no cache local (MySQL) — fire-and-forget */
-  _salvarCache(chave, dados) {
+  _salvarCache(chave, dados, ttlMinutes = 5) {
+    _memCache.set(chave, { data: dados, expiresAt: Date.now() + ttlMinutes * 60000 });
     painelPool.execute(
       'REPLACE INTO cache_dados (chave, valor, atualizado_em) VALUES (?, ?, NOW())',
       [chave, JSON.stringify(dados)]
@@ -30,7 +33,13 @@ const glpiIntegracaoService = {
   /** Busca dados do cache local — retorna null se falhar (sync facade via stored promise) */
   _lerCache(chave) {
     // Cache reads are best-effort; callers handle null gracefully
-    return null;
+    const entry = _memCache.get(chave);
+    if (!entry) return null;
+    if (entry.expiresAt < Date.now()) {
+      _memCache.delete(chave);
+      return null;
+    }
+    return entry.data;
   },
 
   /** Cria/retorna pool de conexao MySQL (somente leitura) */
@@ -153,123 +162,112 @@ const glpiIntegracaoService = {
     const EF = `AND t.entities_id NOT IN (SELECT id FROM glpi_entities WHERE UPPER(name) LIKE '%PARCEIRO%')`;
     const urgNomes = {1:'Muito baixa',2:'Baixa',3:'Média',4:'Alta',5:'Muito alta'};
 
-    // Chamados abertos
-    const [abertos] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`);
+    const [
+      [abertos], [envelhecidos], [porStatus], [solucionadosHoje], [fechadosHoje],
+      [solucionadosPeriodo], [tempoMedio], [tempoResposta], [slaData], [atendentes],
+      [categorias], [urgencias], [evolucao], [abertosdia], [mediaAbertos], [mediaSoluc],
+      [tempoPrimeiro], [reaberturas], [topSolicitantes], [tempoAtendentes]
+    ] = await Promise.all([
+      // Chamados abertos
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`),
+      // Envelhecidos (>45 dias)
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF} AND t.date < DATE_SUB(NOW(), INTERVAL 45 DAY)`),
+      // Por status
+      p.execute(`SELECT
+        SUM(CASE WHEN t.status=1 THEN 1 ELSE 0 END) as novos,
+        SUM(CASE WHEN t.status=2 THEN 1 ELSE 0 END) as atribuidos,
+        SUM(CASE WHEN t.status=3 THEN 1 ELSE 0 END) as planejados,
+        SUM(CASE WHEN t.status=4 THEN 1 ELSE 0 END) as pendentes
+        FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`),
+      // Solucionados OU fechados hoje
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (DATE(t.solvedate) = CURDATE() OR (t.status = 6 AND DATE(t.closedate) = CURDATE()))`),
+      // Fechados hoje
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status = 6 AND DATE(t.closedate) = CURDATE() AND t.is_deleted = 0 ${EF}`),
+      // Solucionados OU fechados no período
+      p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) OR (t.status = 6 AND t.closedate >= DATE_SUB(NOW(), INTERVAL ? DAY)))`, [dias, dias]),
+      // Tempo médio de solução (horas) — filtrado por solvedate
+      p.execute(`SELECT ROUND(AVG(t.solve_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]),
+      // Tempo médio de primeira resposta
+      p.execute(`SELECT ROUND(AVG(t.takeintoaccount_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.takeintoaccount_delay_stat > 0 AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]),
+      // SLA Solução — regra Qlik (exclui pendente, inclui abertos que passaram do prazo)
+      p.execute(`SELECT COUNT(*) as total,
+        SUM(CASE WHEN t.time_to_resolve IS NOT NULL AND t.status <> 4 AND (
+          t.solvedate > t.time_to_resolve OR (t.solvedate IS NULL AND t.time_to_resolve < NOW())
+        ) THEN 1 ELSE 0 END) as fora_sla
+        FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`, [dias]),
+      // Top atendentes — atribuído AO ticket OU registrou a solução (sem dupla contagem)
+      p.execute(`SELECT
+        CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
+        COUNT(DISTINCT t.id) as resolvidos
+        FROM glpi_tickets t ${GF}
+        JOIN (
+          SELECT tickets_id as tid, users_id FROM glpi_tickets_users WHERE type = 2
+          UNION
+          SELECT items_id as tid, users_id FROM glpi_itilsolutions WHERE itemtype = 'Ticket' AND status != 4
+        ) atu ON atu.tid = t.id
+        JOIN glpi_users u ON u.id = atu.users_id
+        WHERE t.is_deleted = 0 ${EF}
+          AND (t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) OR (t.status = 6 AND t.closedate >= DATE_SUB(NOW(), INTERVAL ? DAY)))
+        GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias, dias]),
+      // Top categorias (abertos)
+      p.execute(`SELECT
+        REPLACE(COALESCE(c.completename, 'Sem categoria'), 'TECNOLOGIA DA INFORMAÇÃO', 'TI') as categoria,
+        COUNT(*) as qtd
+        FROM glpi_tickets t ${GF}
+        LEFT JOIN glpi_itilcategories c ON c.id = t.itilcategories_id
+        WHERE t.status < 5 AND t.is_deleted = 0 ${EF}
+        GROUP BY c.id ORDER BY qtd DESC LIMIT 10`),
+      // Por urgência
+      p.execute(`SELECT t.urgency, COUNT(*) as qtd
+        FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}
+        GROUP BY t.urgency ORDER BY t.urgency`),
+      // Evolução diária
+      p.execute(`SELECT DATE(t.solvedate) as data, COUNT(*) as solucionados
+        FROM glpi_tickets t ${GF}
+        WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
+        GROUP BY DATE(t.solvedate) ORDER BY data`, [dias]),
+      // Abertos por dia
+      p.execute(`SELECT DATE(t.date) as data, COUNT(*) as abertos
+        FROM glpi_tickets t ${GF}
+        WHERE t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
+        GROUP BY DATE(t.date) ORDER BY data`, [dias]),
+      // Médias diárias
+      p.execute(`SELECT ROUND(AVG(qtd),1) as media FROM (
+        SELECT DATE(t.date) as dia, COUNT(*) as qtd FROM glpi_tickets t ${GF}
+        WHERE t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
+        GROUP BY DATE(t.date)) sub`, [dias]),
+      p.execute(`SELECT ROUND(AVG(qtd),1) as media FROM (
+        SELECT DATE(t.solvedate) as dia, COUNT(*) as qtd FROM glpi_tickets t ${GF}
+        WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
+        GROUP BY DATE(t.solvedate)) sub`, [dias]),
+      // Tempo médio primeiro atendimento
+      p.execute(`SELECT ROUND(AVG(t.takeintoaccount_delay_stat/3600),1) as media_horas
+        FROM glpi_tickets t ${GF}
+        WHERE t.takeintoaccount_delay_stat > 0 AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]),
+      // Reaberturas — regra Qlik
+      p.execute(`SELECT COUNT(DISTINCT t.id) as total
+        FROM glpi_tickets t ${GF}
+        JOIN glpi_itilsolutions sol ON sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status = 4
+        WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`, [dias]),
+      // Top Solicitantes (quem abre mais chamados) — Feature 9
+      p.execute(`SELECT u.realname, u.firstname, COUNT(*) as total
+        FROM glpi_tickets t ${GF}
+        JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 1
+        JOIN glpi_users u ON u.id = tu.users_id
+        WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)
+        GROUP BY u.id ORDER BY total DESC LIMIT 10`, [dias]),
+      // Tempo médio por atendente (horas) — Feature 10
+      p.execute(`SELECT u.realname, u.firstname,
+        ROUND(AVG(t.solve_delay_stat/3600),1) as media_horas, COUNT(*) as resolvidos
+        FROM glpi_tickets t ${GF}
+        JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2
+        JOIN glpi_users u ON u.id = tu.users_id
+        WHERE t.solvedate IS NOT NULL AND t.solve_delay_stat > 0 AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
+        GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias]),
+    ]);
 
-    // Envelhecidos (>45 dias)
-    const [envelhecidos] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF} AND t.date < DATE_SUB(NOW(), INTERVAL 45 DAY)`);
-
-    // Por status
-    const [porStatus] = await p.execute(`SELECT
-      SUM(CASE WHEN t.status=1 THEN 1 ELSE 0 END) as novos,
-      SUM(CASE WHEN t.status=2 THEN 1 ELSE 0 END) as atribuidos,
-      SUM(CASE WHEN t.status=3 THEN 1 ELSE 0 END) as planejados,
-      SUM(CASE WHEN t.status=4 THEN 1 ELSE 0 END) as pendentes
-      FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}`);
-
-    // Solucionados OU fechados hoje
-    const [solucionadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (DATE(t.solvedate) = CURDATE() OR (t.status = 6 AND DATE(t.closedate) = CURDATE()))`);
-
-    // Fechados hoje
-    const [fechadosHoje] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.status = 6 AND DATE(t.closedate) = CURDATE() AND t.is_deleted = 0 ${EF}`);
-
-    // Solucionados OU fechados no período
-    const [solucionadosPeriodo] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND (t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) OR (t.status = 6 AND t.closedate >= DATE_SUB(NOW(), INTERVAL ? DAY)))`, [dias, dias]);
-
-    // Tempo médio de solução (horas) — filtrado por solvedate
-    const [tempoMedio] = await p.execute(`SELECT ROUND(AVG(t.solve_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
-
-    // Tempo médio de primeira resposta
-    const [tempoResposta] = await p.execute(`SELECT ROUND(AVG(t.takeintoaccount_delay_stat/3600),1) as media_horas FROM glpi_tickets t ${GF} WHERE t.takeintoaccount_delay_stat > 0 AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
-
-    // SLA Solução — regra Qlik (exclui pendente, inclui abertos que passaram do prazo)
-    const [slaData] = await p.execute(`SELECT COUNT(*) as total,
-      SUM(CASE WHEN t.time_to_resolve IS NOT NULL AND t.status <> 4 AND (
-        t.solvedate > t.time_to_resolve OR (t.solvedate IS NULL AND t.time_to_resolve < NOW())
-      ) THEN 1 ELSE 0 END) as fora_sla
-      FROM glpi_tickets t ${GF} WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`, [dias]);
     const slaPct = slaData[0].total > 0 ? +(((slaData[0].total - parseInt(slaData[0].fora_sla || 0)) / slaData[0].total) * 100).toFixed(1) : 0;
-
-    // Top atendentes — atribuído AO ticket OU registrou a solução (sem dupla contagem)
-    const [atendentes] = await p.execute(`SELECT
-      CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.realname,'')) as nome,
-      COUNT(DISTINCT t.id) as resolvidos
-      FROM glpi_tickets t ${GF}
-      JOIN (
-        SELECT tickets_id as tid, users_id FROM glpi_tickets_users WHERE type = 2
-        UNION
-        SELECT items_id as tid, users_id FROM glpi_itilsolutions WHERE itemtype = 'Ticket' AND status != 4
-      ) atu ON atu.tid = t.id
-      JOIN glpi_users u ON u.id = atu.users_id
-      WHERE t.is_deleted = 0 ${EF}
-        AND (t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) OR (t.status = 6 AND t.closedate >= DATE_SUB(NOW(), INTERVAL ? DAY)))
-      GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias, dias]);
-
-    // Top categorias (abertos)
-    const [categorias] = await p.execute(`SELECT
-      REPLACE(COALESCE(c.completename, 'Sem categoria'), 'TECNOLOGIA DA INFORMAÇÃO', 'TI') as categoria,
-      COUNT(*) as qtd
-      FROM glpi_tickets t ${GF}
-      LEFT JOIN glpi_itilcategories c ON c.id = t.itilcategories_id
-      WHERE t.status < 5 AND t.is_deleted = 0 ${EF}
-      GROUP BY c.id ORDER BY qtd DESC LIMIT 10`);
-
-    // Por urgência
-    const [urgencias] = await p.execute(`SELECT t.urgency, COUNT(*) as qtd
-      FROM glpi_tickets t ${GF} WHERE t.status < 5 AND t.is_deleted = 0 ${EF}
-      GROUP BY t.urgency ORDER BY t.urgency`);
     const urgFormatado = urgencias.map(u => ({ nome: urgNomes[u.urgency] || `Nível ${u.urgency}`, qtd: u.qtd }));
-
-    // Evolução diária
-    const [evolucao] = await p.execute(`SELECT DATE(t.solvedate) as data, COUNT(*) as solucionados
-      FROM glpi_tickets t ${GF}
-      WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
-      GROUP BY DATE(t.solvedate) ORDER BY data`, [dias]);
-
-    // Abertos por dia
-    const [abertosdia] = await p.execute(`SELECT DATE(t.date) as data, COUNT(*) as abertos
-      FROM glpi_tickets t ${GF}
-      WHERE t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
-      GROUP BY DATE(t.date) ORDER BY data`, [dias]);
-
-    // Médias diárias
-    const [mediaAbertos] = await p.execute(`SELECT ROUND(AVG(qtd),1) as media FROM (
-      SELECT DATE(t.date) as dia, COUNT(*) as qtd FROM glpi_tickets t ${GF}
-      WHERE t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
-      GROUP BY DATE(t.date)) sub`, [dias]);
-
-    const [mediaSoluc] = await p.execute(`SELECT ROUND(AVG(qtd),1) as media FROM (
-      SELECT DATE(t.solvedate) as dia, COUNT(*) as qtd FROM glpi_tickets t ${GF}
-      WHERE t.solvedate IS NOT NULL AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
-      GROUP BY DATE(t.solvedate)) sub`, [dias]);
-
-    // Tempo médio primeiro atendimento
-    const [tempoPrimeiro] = await p.execute(`SELECT ROUND(AVG(t.takeintoaccount_delay_stat/3600),1) as media_horas
-      FROM glpi_tickets t ${GF}
-      WHERE t.takeintoaccount_delay_stat > 0 AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}`, [dias]);
-
-    // Reaberturas — regra Qlik
-    const [reaberturas] = await p.execute(`SELECT COUNT(DISTINCT t.id) as total
-      FROM glpi_tickets t ${GF}
-      JOIN glpi_itilsolutions sol ON sol.items_id = t.id AND sol.itemtype = 'Ticket' AND sol.status = 4
-      WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`, [dias]);
-
-    // Top Solicitantes (quem abre mais chamados) — Feature 9
-    const [topSolicitantes] = await p.execute(`SELECT u.realname, u.firstname, COUNT(*) as total
-      FROM glpi_tickets t ${GF}
-      JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 1
-      JOIN glpi_users u ON u.id = tu.users_id
-      WHERE t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)
-      GROUP BY u.id ORDER BY total DESC LIMIT 10`, [dias]);
-
-    // Tempo médio por atendente (horas) — Feature 10
-    const [tempoAtendentes] = await p.execute(`SELECT u.realname, u.firstname,
-      ROUND(AVG(t.solve_delay_stat/3600),1) as media_horas, COUNT(*) as resolvidos
-      FROM glpi_tickets t ${GF}
-      JOIN glpi_tickets_users tu ON tu.tickets_id = t.id AND tu.type = 2
-      JOIN glpi_users u ON u.id = tu.users_id
-      WHERE t.solvedate IS NOT NULL AND t.solve_delay_stat > 0 AND t.solvedate >= DATE_SUB(NOW(), INTERVAL ? DAY) AND t.is_deleted = 0 ${EF}
-      GROUP BY u.id ORDER BY resolvidos DESC LIMIT 10`, [dias]);
 
     return {
       resumo: {
@@ -284,7 +282,7 @@ const glpiIntegracaoService = {
         reaberturas: reaberturas[0].total,
       },
       porStatus: porStatus[0],
-      atendentes: atendentes.map(a => ({ nome: `${a.firstname || ''} ${a.realname || ''}`.trim(), resolvidos: a.resolvidos })),
+      atendentes: atendentes.map(a => ({ nome: a.nome || '', resolvidos: a.resolvidos })),
       categorias,
       urgencias: urgFormatado,
       evolucao,
@@ -979,21 +977,26 @@ const glpiIntegracaoService = {
       { id: 350, nome: 'Permissão - John Deere', cor: '#6342ff' },
     ];
 
-    const resultado = [];
-    for (const cat of categorias) {
-      const [total] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.itilcategories_id = ? AND t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY)`, [cat.id, dias]);
-      const [abertos] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.itilcategories_id = ? AND t.status < 5 AND t.is_deleted = 0 ${EF}`, [cat.id]);
-      const [mesAtual] = await p.execute(`SELECT COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.itilcategories_id = ? AND t.is_deleted = 0 ${EF} AND t.date >= DATE_FORMAT(NOW(), '%Y-%m-01')`, [cat.id]);
-      const [mediaMensal] = await p.execute(`SELECT ROUND(AVG(qtd),0) as media FROM (SELECT DATE_FORMAT(t.date,'%Y-%m') as mes, COUNT(*) as qtd FROM glpi_tickets t ${GF} WHERE t.itilcategories_id = ? AND t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL 6 MONTH) GROUP BY mes) sub`, [cat.id]);
+    const ids = categorias.map(c => c.id);
+    const [[rowsTotais], [rowsAbertos], [rowsMesAtual], [rowsMedia]] = await Promise.all([
+      p.execute(`SELECT t.itilcategories_id as id, COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.itilcategories_id IN (${ids.map(()=>'?').join(',')}) AND t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL ? DAY) GROUP BY t.itilcategories_id`, [...ids, dias]),
+      p.execute(`SELECT t.itilcategories_id as id, COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.itilcategories_id IN (${ids.map(()=>'?').join(',')}) AND t.status < 5 AND t.is_deleted = 0 ${EF} GROUP BY t.itilcategories_id`, ids),
+      p.execute(`SELECT t.itilcategories_id as id, COUNT(*) as total FROM glpi_tickets t ${GF} WHERE t.itilcategories_id IN (${ids.map(()=>'?').join(',')}) AND t.is_deleted = 0 ${EF} AND t.date >= DATE_FORMAT(NOW(), '%Y-%m-01') GROUP BY t.itilcategories_id`, ids),
+      p.execute(`SELECT itilcategories_id as id, ROUND(AVG(qtd),0) as media FROM (SELECT t.itilcategories_id, DATE_FORMAT(t.date,'%Y-%m') as mes, COUNT(*) as qtd FROM glpi_tickets t ${GF} WHERE t.itilcategories_id IN (${ids.map(()=>'?').join(',')}) AND t.is_deleted = 0 ${EF} AND t.date >= DATE_SUB(NOW(), INTERVAL 6 MONTH) GROUP BY t.itilcategories_id, mes) sub GROUP BY itilcategories_id`, ids),
+    ]);
 
-      resultado.push({
-        ...cat,
-        total: total[0].total,
-        abertos: abertos[0].total,
-        mesAtual: mesAtual[0].total,
-        mediaMensal: parseInt(mediaMensal[0].media) || 0,
-      });
-    }
+    const mapTotais = new Map(rowsTotais.map(r => [r.id, r.total]));
+    const mapAbertos = new Map(rowsAbertos.map(r => [r.id, r.total]));
+    const mapMes = new Map(rowsMesAtual.map(r => [r.id, r.total]));
+    const mapMedia = new Map(rowsMedia.map(r => [r.id, r.media]));
+
+    const resultado = categorias.map(cat => ({
+      ...cat,
+      total: parseInt(mapTotais.get(cat.id)) || 0,
+      abertos: parseInt(mapAbertos.get(cat.id)) || 0,
+      mesAtual: parseInt(mapMes.get(cat.id)) || 0,
+      mediaMensal: parseInt(mapMedia.get(cat.id)) || 0,
+    }));
 
     // Evolução mensal das top categorias (últimos 6 meses)
     const [evolucao] = await p.execute(`SELECT

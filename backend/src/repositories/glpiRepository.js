@@ -5,13 +5,15 @@
 const { pool } = require('../config/database');
 
 const glpiRepository = {
-  /** Insere ou atualiza indicador do dia — adiciona coluna envelhecidos se necessária */
-  async upsert({ data, quantidade, envelhecidos = 0 }) {
-    // Garante que a coluna existe (migração automática)
+  /** Garante que a coluna envelhecidos existe — chamar UMA VEZ no startup */
+  async initialize() {
     await pool.execute(
       `ALTER TABLE indicadores_glpi ADD COLUMN IF NOT EXISTS envelhecidos INT NOT NULL DEFAULT 0`
-    ).catch(() => {}); // ignora se já existe ou banco não suporta IF NOT EXISTS
+    ).catch(() => {});
+  },
 
+  /** Insere ou atualiza indicador do dia — adiciona coluna envelhecidos se necessária */
+  async upsert({ data, quantidade, envelhecidos = 0 }) {
     await pool.execute(
       'INSERT INTO indicadores_glpi (data, quantidade, envelhecidos) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quantidade = ?, envelhecidos = ?',
       [data, quantidade, envelhecidos, quantidade, envelhecidos]

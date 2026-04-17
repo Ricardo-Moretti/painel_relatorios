@@ -169,7 +169,10 @@ function agendarRelatorioDiario() {
 }
 
 // Inicializar banco e servidor
-inicializarBanco().then(() => {
+const glpiRepository = require('./repositories/glpiRepository');
+
+inicializarBanco().then(async () => {
+  await glpiRepository.initialize();
   app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
     console.log(`API disponivel em http://localhost:${PORT}/api`);
