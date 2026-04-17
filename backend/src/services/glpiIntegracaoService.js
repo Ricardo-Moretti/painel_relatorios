@@ -65,10 +65,14 @@ const glpiIntegracaoService = {
       });
 
       // READ UNCOMMITTED: sem shared locks — não bloqueia escritas do GLPI web
-      // MAX_EXECUTION_TIME: mata queries que travem por mais de 12s
       pool.on('connection', (conn) => {
-        conn.query('SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED');
-        conn.query('SET SESSION MAX_EXECUTION_TIME=12000');
+        conn.query('SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED', (err) => {
+          if (err) console.warn('[GLPI Pool] READ UNCOMMITTED nao aplicado:', err.message);
+        });
+        // MAX_EXECUTION_TIME: MySQL 5.7.8+; MariaDB usa max_statement_time — tenta ambos silenciosamente
+        conn.query('SET SESSION MAX_EXECUTION_TIME=15000', (err) => {
+          if (err) conn.query('SET SESSION max_statement_time=15', () => {});
+        });
       });
 
       // Log connection info without password

@@ -71,7 +71,7 @@ const glpiController = {
       // Se sem conexão, retorna último dado do cache
       const cache = glpiIntegracaoService._lerCache('glpi_coleta');
       if (cache) {
-        return res.json({ sucesso: true, dados: { ...cache.dados, online: false, cacheDesde: cache.atualizado_em }, mensagem: 'Dados do cache (sem conexão MySQL)' });
+        return res.json({ sucesso: true, dados: { ...cache, online: false }, mensagem: 'Dados do cache (sem conexão MySQL)' });
       }
       next(error);
     }
@@ -104,8 +104,8 @@ const glpiController = {
     } catch (error) {
       const cache = glpiIntegracaoService._lerCache(`glpi_bi_${dias}`);
       if (cache) {
-        console.log(`[GLPI] Usando cache de ${cache.atualizado_em}`);
-        return res.json({ sucesso: true, dados: { ...cache.dados, online: false, cacheDesde: cache.atualizado_em } });
+        console.log('[GLPI] BI usando cache em memória');
+        return res.json({ sucesso: true, dados: { ...cache, online: false } });
       }
       next(error);
     }
@@ -122,8 +122,8 @@ const glpiController = {
       const diasFallback = Math.min(req.query.dias ? parseInt(req.query.dias) : 30, 365);
       const cache = glpiIntegracaoService._lerCache(`glpi_sla_detalhado_${diasFallback}`);
       if (cache) {
-        console.log(`[GLPI] SLA Detalhado usando cache de ${cache.atualizado_em}`);
-        return res.json({ sucesso: true, dados: { ...cache.dados, online: false, cacheDesde: cache.atualizado_em } });
+        console.log('[GLPI] SLA Detalhado usando cache em memória');
+        return res.json({ sucesso: true, dados: { ...cache, online: false } });
       }
       next(error);
     }
@@ -137,7 +137,7 @@ const glpiController = {
       res.json({ sucesso: true, dados });
     } catch (error) {
       const cache = glpiIntegracaoService._lerCache('glpi_relatorio_diario');
-      if (cache) return res.json({ sucesso: true, dados: { ...cache.dados, online: false, cacheDesde: cache.atualizado_em } });
+      if (cache) return res.json({ sucesso: true, dados: { ...cache, online: false } });
       next(error);
     }
   },
@@ -196,7 +196,7 @@ const glpiController = {
       res.json({ sucesso: true, dados });
     } catch (error) {
       const cache = glpiIntegracaoService._lerCache('glpi_filtros');
-      if (cache) return res.json({ sucesso: true, dados: { ...cache.dados, online: false } });
+      if (cache) return res.json({ sucesso: true, dados: { ...cache, online: false } });
       next(error);
     }
   },
@@ -209,7 +209,7 @@ const glpiController = {
       res.json({ sucesso: true, dados: resultado });
     } catch (error) {
       const cache = glpiIntegracaoService._lerCache('glpi_comparar_meses');
-      if (cache) return res.json({ sucesso: true, dados: { ...cache.dados, online: false, cacheDesde: cache.atualizado_em } });
+      if (cache) return res.json({ sucesso: true, dados: { ...cache, online: false } });
       next(error);
     }
   },
@@ -223,7 +223,7 @@ const glpiController = {
       res.json({ sucesso: true, dados });
     } catch (error) {
       const cache = glpiIntegracaoService._lerCache('glpi_metricas_cat');
-      if (cache) return res.json({ sucesso: true, dados: { ...cache.dados, online: false } });
+      if (cache) return res.json({ sucesso: true, dados: { ...cache, online: false } });
       next(error);
     }
   },
